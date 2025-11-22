@@ -225,6 +225,7 @@ export var Game = /*#__PURE__*/ function() {
         this.loadedModels = {};
         this.pandaModel = null; // Add reference for the Panda model
         this.dragonModel = null; // Add reference for the Dragon model
+        this.interactiveModels = []; // Array to track all interactive models in the scene
         this.animationMixer = null; // For model animations
         this.animationClips = []; // To store all animation clips from the model
         this.animationActions = {}; // To store animation actions by name or index
@@ -276,10 +277,10 @@ export var Game = /*#__PURE__*/ function() {
         this.fingertipGrabOpacity = 1.0; // Opacity when hand is actively grabbing/interacting
         this.instructionTextElement = document.querySelector("#instruction-text"); // DOM element for instruction text
         this.interactionModeInstructions = {
-            drag: "Pinch to grab and move the model",
-            rotate: "Pinch and move hand left/right to rotate",
-            scale: "Use two hands. Pinch with both and move hands closer/farther",
-            animate: "Pinch and move hand up/down to cycle animations" // Updated instruction
+            drag: "Pellizca para agarrar y mover el modelo",
+            rotate: "Pellizca y mueve la mano izquierda/derecha para rotar",
+            scale: "Usa dos manos. Pellizca con ambas y acerca/aleja las manos",
+            animate: "Pellizca y mueve la mano arriba/abajo para cambiar animaciones"
         };
         this.animationControlHandIndex = -1; // Index of the hand controlling animation scrolling
         this.animationControlInitialPinchY = null; // Initial Y position of the pinch for animation scrolling
@@ -287,7 +288,7 @@ export var Game = /*#__PURE__*/ function() {
         // Initialize asynchronously
         this._init().catch(function(error) {
             console.error("Initialization failed:", error);
-            _this._showError("Initialization failed. Check console.");
+            _this._showError("Error de inicialización. Revisa la consola.");
         });
     }
     _create_class(Game, [
@@ -524,14 +525,21 @@ export var Game = /*#__PURE__*/ function() {
                 this.gameContainer.appendChild(this.interactionModeContainer);
                 // Create interaction mode buttons
                 [
-                    'Drag',
-                    'Rotate',
-                    'Scale',
-                    'Animate'
+                    'Arrastrar',
+                    'Rotar',
+                    'Escalar',
+                    'Animar'
                 ].forEach(function(mode) {
+                    var modeMap = {
+                        'Arrastrar': 'drag',
+                        'Rotar': 'rotate',
+                        'Escalar': 'scale',
+                        'Animar': 'animate'
+                    };
+                    var modeKey = modeMap[mode];
                     var button = document.createElement('button');
                     button.innerText = mode;
-                    button.id = "interaction-mode-".concat(mode.toLowerCase());
+                    button.id = "interaction-mode-".concat(modeKey);
                     button.style.padding = '10px 22px'; // Increased padding
                     button.style.fontSize = '18px'; // Increased font size further
                     button.style.border = '2px solid black'; // Consistent black border
@@ -541,10 +549,10 @@ export var Game = /*#__PURE__*/ function() {
                     button.style.transition = 'background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease'; // Faster transition, added shadow
                     button.style.boxShadow = '2px 2px 0px black'; // Default shadow for inactive
                     button.addEventListener('click', function() {
-                        return _this._setInteractionMode(mode.toLowerCase());
+                        return _this._setInteractionMode(modeKey);
                     });
                     _this.interactionModeContainer.appendChild(button);
-                    _this.interactionModeButtons[mode.toLowerCase()] = button; // Store button reference
+                    _this.interactionModeButtons[modeKey] = button; // Store button reference
                 });
                 this._updateInteractionModeButtonStyles(); // Apply initial styles
                 this._updateInstructionText(); // Set initial instruction text
@@ -779,9 +787,28 @@ export var Game = /*#__PURE__*/ function() {
                                                     _this.animationButtonsContainer.appendChild(button);
                                                     console.log("Loaded animation and created button for: ".concat(actionName));
                                                 });
+                                                // Add a "None" button to stop all animations
+                                                var noneButton = document.createElement('button');
+                                                noneButton.innerText = 'Ninguna';
+                                                noneButton.style.padding = '5px 10px';
+                                                noneButton.style.fontSize = '13px';
+                                                noneButton.style.backgroundColor = '#f0f0f0';
+                                                noneButton.style.color = 'black';
+                                                noneButton.style.border = '2px solid black';
+                                                noneButton.style.borderRadius = '4px';
+                                                noneButton.style.cursor = 'pointer';
+                                                noneButton.style.transition = 'background-color 0.2s ease, box-shadow 0.2s ease';
+                                                noneButton.style.boxShadow = '2px 2px 0px black';
+                                                noneButton.addEventListener('click', function() {
+                                                    return _this._playAnimation('None');
+                                                });
+                                                _this.animationButtonsContainer.appendChild(noneButton);
+                                                _this.animationActions['None'] = null;
                                                 // Play the first animation by default
                                                 // Try to find and play an "idle" animation by default
-                                                var defaultActionName = Object.keys(_this.animationActions)[0]; // Fallback to the first animation
+                                                var defaultActionName = Object.keys(_this.animationActions).filter(function(name) {
+                                                    return name !== 'None';
+                                                })[0]; // Fallback to the first animation (excluding None)
                                                 var idleActionKey = Object.keys(_this.animationActions).find(function(name) {
                                                     return name.toLowerCase().includes('idle');
                                                 });
@@ -791,7 +818,7 @@ export var Game = /*#__PURE__*/ function() {
                                                 } else if (defaultActionName) {
                                                     console.log("No specific idle animation found, defaulting to first animation: ".concat(defaultActionName));
                                                 }
-                                                if (defaultActionName && _this.animationActions[defaultActionName]) {
+                                                if (defaultActionName && _this.animationActions[defaultActionName] && defaultActionName !== 'None') {
                                                     _this.currentAction = _this.animationActions[defaultActionName];
                                                     _this.currentAction.play();
                                                     console.log("Playing default animation: ".concat(defaultActionName));
@@ -825,6 +852,7 @@ export var Game = /*#__PURE__*/ function() {
                                             );
                                             
                                             _this.scene.add(_this.pandaModel);
+                                            _this.interactiveModels.push(_this.pandaModel);
                                             console.log("GLTF model loaded and added to scene. Scale:", scale, "Position:", _this.pandaModel.position);
                                             resolve();
                                         }, undefined, function(error) {
@@ -844,7 +872,7 @@ export var Game = /*#__PURE__*/ function() {
                             case 3:
                                 error = _state.sent();
                                 console.error("Error loading assets:", error);
-                                _this._showError("Failed to load 3D model.");
+                                _this._showError("Error al cargar el modelo 3D.");
                                 throw error; // Stop initialization
                             case 4:
                                 return [
@@ -925,7 +953,7 @@ export var Game = /*#__PURE__*/ function() {
                             case 4:
                                 error = _state.sent();
                                 console.error('Error setting up Hand Tracking or Webcam:', error);
-                                _this._showError("Webcam/Hand Tracking Error: ".concat(error.message, ". Please allow camera access."));
+                                _this._showError("Error de Cámara/Seguimiento de Manos: ".concat(error.message, ". Por favor permite el acceso a la cámara."));
                                 throw error; // Re-throw to stop initialization
                             case 5:
                                 return [
@@ -1096,25 +1124,27 @@ export var Game = /*#__PURE__*/ function() {
                                     }
                                 } else if (_this1.interactionMode === 'drag') {
                                     if (hand.isPinching) {
-                                        if (!prevIsPinching && _this1.grabbingHandIndex === -1 && _this1.pandaModel) {
-                                            // REMOVED: Bounding box check - drag can be initiated from anywhere if not scaling
-                                            _this1.grabbingHandIndex = i;
-                                            _this1.pickedUpModel = _this1.pandaModel;
-                                            // Convert 2D screen pinch point to 3D world point on a plane
-                                            // The plane is at the model's current Z depth
-                                            _this1.modelGrabStartDepth = _this1.pickedUpModel.position.z; // Store initial depth
-                                            var pinchX = hand.pinchPointScreen.x;
-                                            var pinchY = hand.pinchPointScreen.y;
-                                            // Convert 2D screen pinch point (origin center) to NDC (Normalized Device Coords, -1 to 1)
-                                            var ndcX = pinchX / (_this1.gameContainer.clientWidth / 2);
-                                            var ndcY = pinchY / (_this1.gameContainer.clientHeight / 2);
-                                            var pinchPoint3DWorld = new THREE.Vector3(ndcX, ndcY, 0.5); // Start with a neutral NDC Z
-                                            pinchPoint3DWorld.unproject(_this1.camera);
-                                            pinchPoint3DWorld.z = _this1.modelGrabStartDepth; // Force Z to the grab depth
-                                            console.log("Grab screen: (".concat(pinchX.toFixed(2), ", ").concat(pinchY.toFixed(2), "), NDC: (").concat(ndcX.toFixed(2), ", ").concat(ndcY.toFixed(2), ")"));
-                                            console.log("Grab 3D World (pre-offset): ".concat(pinchPoint3DWorld.x.toFixed(2), ", ").concat(pinchPoint3DWorld.y.toFixed(2), ", ").concat(pinchPoint3DWorld.z.toFixed(2)));
-                                            _this1.modelDragOffset.subVectors(_this1.pickedUpModel.position, pinchPoint3DWorld);
-                                            console.log("Hand ".concat(i, " GRABBED model for DRAG at depth ").concat(_this1.modelGrabStartDepth, ". Offset:"), _this1.modelDragOffset.x.toFixed(2), _this1.modelDragOffset.y.toFixed(2), _this1.modelDragOffset.z.toFixed(2));
+                                        if (!prevIsPinching && _this1.interactiveModels.length > 0) {
+                                            var pickedModel = _this1._findClosestModelToHand(hand);
+                                            if (pickedModel) {
+                                                _this1.grabbingHandIndex = i;
+                                                _this1.pickedUpModel = pickedModel;
+                                                // Convert 2D screen pinch point to 3D world point on a plane
+                                                // The plane is at the model's current Z depth
+                                                _this1.modelGrabStartDepth = _this1.pickedUpModel.position.z; // Store initial depth
+                                                var pinchX = hand.pinchPointScreen.x;
+                                                var pinchY = hand.pinchPointScreen.y;
+                                                // Convert 2D screen pinch point (origin center) to NDC (Normalized Device Coords, -1 to 1)
+                                                var ndcX = pinchX / (_this1.gameContainer.clientWidth / 2);
+                                                var ndcY = pinchY / (_this1.gameContainer.clientHeight / 2);
+                                                var pinchPoint3DWorld = new THREE.Vector3(ndcX, ndcY, 0.5); // Start with a neutral NDC Z
+                                                pinchPoint3DWorld.unproject(_this1.camera);
+                                                pinchPoint3DWorld.z = _this1.modelGrabStartDepth; // Force Z to the grab depth
+                                                console.log("Grab screen: (".concat(pinchX.toFixed(2), ", ").concat(pinchY.toFixed(2), "), NDC: (").concat(ndcX.toFixed(2), ", ").concat(ndcY.toFixed(2), ")"));
+                                                console.log("Grab 3D World (pre-offset): ".concat(pinchPoint3DWorld.x.toFixed(2), ", ").concat(pinchPoint3DWorld.y.toFixed(2), ", ").concat(pinchPoint3DWorld.z.toFixed(2)));
+                                                _this1.modelDragOffset.subVectors(_this1.pickedUpModel.position, pinchPoint3DWorld);
+                                                console.log("Hand ".concat(i, " GRABBED model for DRAG at depth ").concat(_this1.modelGrabStartDepth, ". Offset:"), _this1.modelDragOffset.x.toFixed(2), _this1.modelDragOffset.y.toFixed(2), _this1.modelDragOffset.z.toFixed(2));
+                                            }
                                         } else if (_this1.grabbingHandIndex === i && _this1.pickedUpModel) {
                                             // Update model position based on pinch
                                             var currentPinchX = hand.pinchPointScreen.x;
@@ -1139,12 +1169,16 @@ export var Game = /*#__PURE__*/ function() {
                                     }
                                 } else if (_this1.interactionMode === 'rotate') {
                                     if (hand.isPinching) {
-                                        if (!prevIsPinching && _this1.grabbingHandIndex === -1 && _this1.pandaModel) {
-                                            // REMOVED: Bounding box check - rotate can be initiated from anywhere if not scaling
-                                            _this1.grabbingHandIndex = i;
-                                            _this1.pickedUpModel = _this1.pandaModel;
-                                            _this1.rotateLastHandX = hand.pinchPointScreen.x; // Store initial pinch X for delta calculation
-                                            console.log("Hand ".concat(i, " INITIATED ROTATION on model via pinch from anywhere."));
+                                        if (!prevIsPinching && _this1.interactiveModels.length > 0) {
+                                            var pickedModel = _this1._findClosestModelToHand(hand);
+                                            if (pickedModel) {
+                                                _this1.grabbingHandIndex = i;
+                                                _this1.pickedUpModel = pickedModel;
+                                            }
+                                            if (_this1.pickedUpModel) {
+                                                _this1.rotateLastHandX = hand.pinchPointScreen.x; // Store initial pinch X for delta calculation
+                                                console.log("Hand ".concat(i, " INITIATED ROTATION on model via pinch from anywhere."));
+                                            }
                                         } else if (_this1.grabbingHandIndex === i && _this1.pickedUpModel && _this1.rotateLastHandX !== null) {
                                             var currentHandX = hand.pinchPointScreen.x; // Use pinch point X for delta
                                             var deltaX = currentHandX - _this1.rotateLastHandX;
@@ -1165,17 +1199,24 @@ export var Game = /*#__PURE__*/ function() {
                                 } else if (_this1.interactionMode === 'scale') {
                                     var hand0 = _this1.hands[0];
                                     var hand1 = _this1.hands[1];
-                                    if (hand0 && hand1 && hand0.landmarks && hand1.landmarks && hand0.isPinching && hand1.isPinching) {
+                                    var hand0Valid = hand0 && hand0.landmarks && hand0.isPinching;
+                                    var hand1Valid = hand1 && hand1.landmarks && hand1.isPinching;
+                                    if (hand0Valid && hand1Valid) {
                                         // Both hands are visible and pinching
                                         var dist = hand0.pinchPointScreen.distanceTo(hand1.pinchPointScreen);
                                         if (_this1.scaleInitialPinchDistance === null || _this1.scaleInitialModelScale === null) {
-                                            // Start of scaling gesture
-                                            _this1.scaleInitialPinchDistance = dist;
-                                            _this1.scaleInitialModelScale = _this1.pandaModel.scale.clone(); // Store initial scale vector
-                                            _this1.grabbingHandIndex = 0; // Mark as "grabbing" for scaling (using hand 0 as primary)
-                                            _this1.pickedUpModel = _this1.pandaModel; // Indicate model is being interacted with
-                                            // if(this.grabMarker) this.grabMarker.visible = false; // Grab marker removed
-                                            console.log("Scaling initiated. Initial pinch dist: ".concat(dist.toFixed(2), ", Initial scale: ").concat(_this1.scaleInitialModelScale.x.toFixed(2)));
+                                            console.log('Scale mode: both hands pinching, finding closest model...');
+                                            var pickedModel = _this1._findClosestModelToPinchMidpoint(hand0, hand1);
+                                            if (pickedModel) {
+                                                _this1.scaleInitialPinchDistance = dist;
+                                                _this1.scaleInitialModelScale = pickedModel.scale.clone(); // Store initial scale vector
+                                                _this1.grabbingHandIndex = 0; // Mark as "grabbing" for scaling (using hand 0 as primary)
+                                                _this1.pickedUpModel = pickedModel; // Indicate model is being interacted with
+                                                // if(this.grabMarker) this.grabMarker.visible = false; // Grab marker removed
+                                                console.log("Scaling initiated. Initial pinch dist: ".concat(dist.toFixed(2), ", Initial scale: ").concat(_this1.scaleInitialModelScale.x.toFixed(2)));
+                                            } else {
+                                                console.log('Scale mode: no model found to pick');
+                                            }
                                         } else {
                                             // Continue scaling
                                             var deltaDistance = dist - _this1.scaleInitialPinchDistance;
@@ -1185,7 +1226,9 @@ export var Game = /*#__PURE__*/ function() {
                                             var minScale = 10; // Example min scale (adjust based on model's base size)
                                             var maxScale = 300; // Example max scale
                                             newScaleValue = Math.max(minScale, Math.min(maxScale, newScaleValue));
-                                            _this1.pandaModel.scale.set(newScaleValue, newScaleValue, newScaleValue);
+                                            if (_this1.pickedUpModel) {
+                                                _this1.pickedUpModel.scale.set(newScaleValue, newScaleValue, newScaleValue);
+                                            }
                                         // console.log(`Scaling: Current pinch dist: ${dist.toFixed(2)}, Scale change: ${scaleFactorChange.toFixed(3)}, New scale value: ${newScaleValue.toFixed(2)}`);
                                         }
                                     } else {
@@ -1277,15 +1320,104 @@ export var Game = /*#__PURE__*/ function() {
             }
         },
         {
+            key: "_findModelAtPoint",
+            value: function _findModelAtPoint(screenX, screenY) {
+                for (var i = this.interactiveModels.length - 1; i >= 0; i--) {
+                    var model = this.interactiveModels[i];
+                    var bbox = this._getModelScreenBoundingBox(model);
+                    if (bbox && screenX >= bbox.minX && screenX <= bbox.maxX && screenY >= bbox.minY && screenY <= bbox.maxY) {
+                        return model;
+                    }
+                }
+                return null;
+            }
+        },
+        {
+            key: "_findClosestModelToHand",
+            value: function _findClosestModelToHand(hand) {
+                if (!hand || !hand.landmarks || this.interactiveModels.length === 0) {
+                    return null;
+                }
+                var thumbTip = hand.landmarks[4];
+                var indexTip = hand.landmarks[8];
+                var canvasWidth = this.gameContainer.clientWidth;
+                var canvasHeight = this.gameContainer.clientHeight;
+                var pinchScreenX = ((thumbTip.x + indexTip.x) / 2 * canvasWidth - canvasWidth / 2);
+                var pinchScreenY = (canvasHeight / 2 - (thumbTip.y + indexTip.y) / 2 * canvasHeight);
+                var closestModel = null;
+                var minDistance = Infinity;
+                for (var i = 0; i < this.interactiveModels.length; i++) {
+                    var model = this.interactiveModels[i];
+                    var bbox = this._getModelScreenBoundingBox(model);
+                    if (!bbox) continue;
+                    var closestX = Math.max(bbox.minX, Math.min(pinchScreenX, bbox.maxX));
+                    var closestY = Math.max(bbox.minY, Math.min(pinchScreenY, bbox.maxY));
+                    var distance = Math.sqrt(
+                        Math.pow(pinchScreenX - closestX, 2) +
+                        Math.pow(pinchScreenY - closestY, 2)
+                    );
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestModel = model;
+                    }
+                }
+                return closestModel;
+            }
+        },
+        {
+            key: "_findClosestModelToPinchMidpoint",
+            value: function _findClosestModelToPinchMidpoint(hand0, hand1) {
+                if (!hand0 || !hand1 || !hand0.landmarks || !hand1.landmarks || this.interactiveModels.length === 0) {
+                    return null;
+                }
+                var thumbTip0 = hand0.landmarks[4];
+                var indexTip0 = hand0.landmarks[8];
+                var thumbTip1 = hand1.landmarks[4];
+                var indexTip1 = hand1.landmarks[8];
+                var canvasWidth = this.gameContainer.clientWidth;
+                var canvasHeight = this.gameContainer.clientHeight;
+                var pinch0X = ((thumbTip0.x + indexTip0.x) / 2 * canvasWidth - canvasWidth / 2);
+                var pinch0Y = (canvasHeight / 2 - (thumbTip0.y + indexTip0.y) / 2 * canvasHeight);
+                var pinch1X = ((thumbTip1.x + indexTip1.x) / 2 * canvasWidth - canvasWidth / 2);
+                var pinch1Y = (canvasHeight / 2 - (thumbTip1.y + indexTip1.y) / 2 * canvasHeight);
+                var closestModel = null;
+                var minAvgDistance = Infinity;
+                for (var i = 0; i < this.interactiveModels.length; i++) {
+                    var model = this.interactiveModels[i];
+                    var bbox = this._getModelScreenBoundingBox(model);
+                    if (!bbox) continue;
+                    var closestX0 = Math.max(bbox.minX, Math.min(pinch0X, bbox.maxX));
+                    var closestY0 = Math.max(bbox.minY, Math.min(pinch0Y, bbox.maxY));
+                    var distance0 = Math.sqrt(
+                        Math.pow(pinch0X - closestX0, 2) +
+                        Math.pow(pinch0Y - closestY0, 2)
+                    );
+                    var closestX1 = Math.max(bbox.minX, Math.min(pinch1X, bbox.maxX));
+                    var closestY1 = Math.max(bbox.minY, Math.min(pinch1Y, bbox.maxY));
+                    var distance1 = Math.sqrt(
+                        Math.pow(pinch1X - closestX1, 2) +
+                        Math.pow(pinch1Y - closestY1, 2)
+                    );
+                    var avgDistance = (distance0 + distance1) / 2;
+                    if (avgDistance < minAvgDistance) {
+                        minAvgDistance = avgDistance;
+                        closestModel = model;
+                    }
+                }
+                console.log('Scale mode - picked model with avg distance:', minAvgDistance);
+                return closestModel;
+            }
+        },
+        {
             key: "_getModelScreenBoundingBox",
-            value: function _getModelScreenBoundingBox() {
+            value: function _getModelScreenBoundingBox(model) {
                 var _this = this;
-                if (!this.pandaModel || !this.camera || !this.renderer) {
+                if (!model || !this.camera || !this.renderer) {
                     return null;
                 }
                 // Ensure the model's world matrix is up to date
-                this.pandaModel.updateMatrixWorld(true);
-                var box = new THREE.Box3().setFromObject(this.pandaModel);
+                model.updateMatrixWorld(true);
+                var box = new THREE.Box3().setFromObject(model);
                 if (box.isEmpty()) {
                     return null; // Model might not be loaded or has no geometry
                 }
@@ -1304,7 +1436,7 @@ export var Game = /*#__PURE__*/ function() {
                 var canvasHeight = this.gameContainer.clientHeight;
                 corners.forEach(function(corner) {
                     // Apply model's world transformation to the local bounding box corners
-                    corner.applyMatrix4(_this.pandaModel.matrixWorld);
+                    corner.applyMatrix4(model.matrixWorld);
                     // Project to Normalized Device Coordinates (NDC)
                     corner.project(_this.camera);
                     // Convert NDC to screen coordinates (origin at center of screen)
@@ -1403,7 +1535,7 @@ export var Game = /*#__PURE__*/ function() {
             key: "_showError",
             value: function _showError(message) {
                 this.gameOverContainer.style.display = 'block';
-                this.gameOverText.innerText = "ERROR: ".concat(message);
+                this.gameOverText.innerText = message;
                 this.gameOverText.style.color = 'orange';
                 this.restartHintText.style.display = 'true'; // Show restart hint on error
                 this.gameState = 'error';
@@ -1765,6 +1897,15 @@ export var Game = /*#__PURE__*/ function() {
         {
             key: "_playAnimation",
             value: function _playAnimation(name) {
+                if (name === 'None') {
+                    if (this.currentAction) {
+                        this.currentAction.fadeOut(0.5);
+                        this.currentAction = null;
+                    }
+                    console.log("Stopped all animations.");
+                    this._updateButtonStyles(name);
+                    return;
+                }
                 if (!this.animationActions[name]) {
                     console.warn('Animation "'.concat(name, '" not found.'));
                     return;
@@ -1841,7 +1982,7 @@ export var Game = /*#__PURE__*/ function() {
             key: "_updateInstructionText",
             value: function _updateInstructionText() {
                 if (this.instructionTextElement) {
-                    var instruction = this.interactionModeInstructions[this.interactionMode] || "Use hand gestures to interact.";
+                    var instruction = this.interactionModeInstructions[this.interactionMode] || "Usa gestos con las manos para interactuar.";
                     this.instructionTextElement.innerText = instruction;
                     // The instruction text should always be 10px from the bottom.
                     // The animation buttons are positioned from the top-left and should not affect this.
@@ -1935,7 +2076,7 @@ export var Game = /*#__PURE__*/ function() {
                             _this._loadDroppedModel(file);
                         } else {
                             console.warn('Dropped file is not a recognized GLTF format:', file.name, file.type);
-                            _this._showStatusScreen('"'.concat(file.name, '" is not a GLTF model.'), 'orange', false);
+                            _this._showStatusScreen('"'.concat(file.name, '" no es un modelo GLTF.'), 'orange', false);
                             setTimeout(function() {
                                 if (_this.gameOverContainer.style.display === 'block' && _this.gameOverText.innerText.includes(file.name)) {
                                     _this.gameOverContainer.style.display = 'none';
@@ -1959,9 +2100,9 @@ export var Game = /*#__PURE__*/ function() {
                 };
                 reader.onerror = function(error) {
                     console.error("FileReader error for ".concat(file.name, ":"), error);
-                    _this._showError("Error reading file ".concat(file.name, "."));
+                    _this._showError("Error al leer el archivo ".concat(file.name, "."));
                     // Ensure loading message is hidden if it was shown by this function
-                    if (_this.gameOverContainer.style.display === 'block' && _this.gameOverText.innerText.startsWith('Loading "'.concat(file.name, '"'))) {
+                    if (_this.gameOverContainer.style.display === 'block' && _this.gameOverText.innerText.startsWith('Cargando "'.concat(file.name, '"'))) {
                         _this.gameOverContainer.style.display = 'none';
                     }
                 };
@@ -1974,11 +2115,11 @@ export var Game = /*#__PURE__*/ function() {
                     console.log("Reading ".concat(file.name, " as text."));
                     reader.readAsText(file);
                 } else {
-                    var message = file.type ? "Unsupported file type: ".concat(file.type) : 'Cannot determine file type.';
+                    var message = file.type ? "Tipo de archivo no soportado: ".concat(file.type) : 'No se puede determinar el tipo de archivo.';
                     console.warn("Unknown file format for GLTF loader: ".concat(file.name, ", Type: ").concat(file.type));
-                    this._showError("".concat(message, " for ").concat(file.name, ". Please drop a .gltf or .glb file."));
+                    this._showError("".concat(message, " para ").concat(file.name, ". Por favor arrastra un archivo .gltf o .glb."));
                     // Ensure loading message is hidden
-                    if (this.gameOverContainer.style.display === 'block' && this.gameOverText.innerText.startsWith('Loading "'.concat(file.name, '"'))) {
+                    if (this.gameOverContainer.style.display === 'block' && this.gameOverText.innerText.startsWith('Cargando "'.concat(file.name, '"'))) {
                         this.gameOverContainer.style.display = 'none';
                     }
                 }
@@ -2047,14 +2188,33 @@ export var Game = /*#__PURE__*/ function() {
                                 });
                                 _this.animationButtonsContainer.appendChild(button);
                             });
-                            var defaultActionName = Object.keys(_this.animationActions)[0];
+                            // Add a "None" button to stop all animations
+                            var noneButton = document.createElement('button');
+                            noneButton.innerText = 'None';
+                            noneButton.style.padding = '5px 10px';
+                            noneButton.style.fontSize = '13px';
+                            noneButton.style.backgroundColor = '#f0f0f0';
+                            noneButton.style.color = 'black';
+                            noneButton.style.border = '2px solid black';
+                            noneButton.style.borderRadius = '4px';
+                            noneButton.style.cursor = 'pointer';
+                            noneButton.style.transition = 'background-color 0.2s ease, box-shadow 0.2s ease';
+                            noneButton.style.boxShadow = '2px 2px 0px black';
+                            noneButton.addEventListener('click', function() {
+                                return _this._playAnimation('None');
+                            });
+                            _this.animationButtonsContainer.appendChild(noneButton);
+                            _this.animationActions['None'] = null;
+                            var defaultActionName = Object.keys(_this.animationActions).filter(function(name) {
+                                return name !== 'None';
+                            })[0];
                             var idleActionKey = Object.keys(_this.animationActions).find(function(name) {
                                 return name.toLowerCase().includes('idle');
                             });
                             if (idleActionKey) {
                                 defaultActionName = idleActionKey;
                             }
-                            if (defaultActionName && _this.animationActions[defaultActionName]) {
+                            if (defaultActionName && _this.animationActions[defaultActionName] && defaultActionName !== 'None') {
                                 _this.currentAction = _this.animationActions[defaultActionName];
                                 _this.currentAction.reset().play();
                                 _this._updateButtonStyles(defaultActionName);
@@ -2078,12 +2238,12 @@ export var Game = /*#__PURE__*/ function() {
                         _this.loadedDroppedModelData = null; // Clear the temp storage
                     }, function(error) {
                         console.error("Error parsing GLTF model ".concat(fileName, ":"), error);
-                        _this._showError('Failed to parse "'.concat(fileName, '". Model might be corrupt or unsupported. Check console.'));
+                        _this._showError('Error al analizar "'.concat(fileName, '". El modelo puede estar corrupto o no ser compatible. Revisa la consola.'));
                     });
                 } catch (e) {
                     // This catch is for synchronous errors during loader.parse() setup, though most errors are async.
                     console.error("Critical error during GLTF parsing setup for ".concat(fileName, ":"), e);
-                    this._showError('Error setting up parser for "'.concat(fileName, '".'));
+                    this._showError('Error al configurar el analizador para "'.concat(fileName, '".'));
                 }
             }
         },
@@ -2092,14 +2252,44 @@ export var Game = /*#__PURE__*/ function() {
             value: function _createDragon() {
                 var _this = this;
                 if (this.dragonModel && this.scene && this.scene.children.includes(this.dragonModel)) {
+                    console.log('Dragon already exists in scene');
                     return;
                 }
+                console.log('Loading dragon model...');
                 var gltfLoader = new GLTFLoader();
                 var modelPath = 'assets/dragon.gltf';
-                gltfLoader.load(modelPath, function(gltf) {
+                gltfLoader.setPath('assets/');
+                gltfLoader.load('dragon.gltf', function(gltf) {
                     _this.dragonModel = gltf.scene;
+                    var box = new THREE.Box3().setFromObject(_this.dragonModel);
+                    var size = box.getSize(new THREE.Vector3());
+                    var center = box.getCenter(new THREE.Vector3());
+                    var scale = 150 / Math.max(size.x, size.y, size.z);
+                    _this.dragonModel.scale.set(0.01, 0.01, 0.01);
+                    _this.dragonModel.position.set(
+                        -center.x * scale + 200,
+                        -center.y * scale,
+                        -800
+                    );
                     if (_this.scene) {
                         _this.scene.add(_this.dragonModel);
+                        _this.interactiveModels.push(_this.dragonModel);
+                        console.log('Dragon model loaded and added to scene at position:', _this.dragonModel.position);
+                        var startTime = Date.now();
+                        var duration = 1000;
+                        var targetScale = scale;
+                        var animateDragonEntrance = function() {
+                            var elapsed = Date.now() - startTime;
+                            var progress = Math.min(elapsed / duration, 1);
+                            var easeProgress = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+                            var currentScale = 0.01 + (targetScale - 0.01) * easeProgress;
+                            _this.dragonModel.scale.set(currentScale, currentScale, currentScale);
+                            _this.dragonModel.rotation.y = easeProgress * Math.PI * 2;
+                            if (progress < 1) {
+                                requestAnimationFrame(animateDragonEntrance);
+                            }
+                        };
+                        animateDragonEntrance();
                     }
                 }, undefined, function(error) {
                     console.error('Error loading dragon model:', error);

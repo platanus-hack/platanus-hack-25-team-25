@@ -156,6 +156,7 @@ export var SpeechManager = /*#__PURE__*/ function() {
         var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             this.recognition = new SpeechRecognition();
+            this.recognition.lang = 'es-ES';
             this.recognition.continuous = true; // Keep listening even after a pause
             this.recognition.interimResults = true; // Get results while speaking
             this.recognition.onstart = function() {
@@ -177,16 +178,20 @@ export var SpeechManager = /*#__PURE__*/ function() {
                         }
                         // Check for commands
                         var commandMap = {
-                            'drag': 'drag',
-                            'rotate': 'rotate',
-                            'rotation': 'rotate',
-                            'scale': 'scale',
-                            'size': 'scale',
+                            'arrastrar': 'drag',
+                            'arrastra': 'drag',
+                            'rotar': 'rotate',
+                            'rotación': 'rotate',
+                            'gira': 'rotate',
+                            'girar': 'rotate',
+                            'escalar': 'scale',
+                            'escala': 'scale',
+                            'tamaño': 'scale',
                             'zoom': 'scale',
-                            'animate': 'animate',
-                            'anime': 'animate',
-                            'animation': 'animate',
-                            'dragon': 'dragon'
+                            'animar': 'animate',
+                            'animación': 'animate',
+                            'anima': 'animate',
+                            'dragón': 'dragon'
                         };
                         var spokenCommands = Object.keys(commandMap);
                         var _iteratorNormalCompletion = true, _didIteratorError = false, _iteratorError = undefined;
@@ -342,7 +347,7 @@ export var SpeechManager = /*#__PURE__*/ function() {
                                 err = _state.sent();
                                 console.error("Microphone permission denied or error:", err);
                                 if (_this.onTranscript) {
-                                    _this.onTranscript("Microphone access denied. Please allow microphone access in your browser settings.", "");
+                                    _this.onTranscript("Acceso al micrófono denegado. Por favor permite el acceso al micrófono en la configuración de tu navegador.", "");
                                 }
                                 return [
                                     3,

@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>3D Model Playground</title>
+        <title>Imagination Lab</title>
         <link rel="stylesheet" href="styles.css">
 
         <!-- Primary Meta Tags -->
-        <meta name="title" content="3D Model Playground">
-        <meta name="description" content="Control 3D models with hand gestures & voice commands">
+        <meta name="title" content="Imagination Lab">
+        <meta name="description" content="A virtual world for kids to explore and learn">
 
         <script type="importmap">
             {
@@ -23,34 +23,34 @@
     <body style="width: 100%; height: 100%; overflow: hidden; margin: 0;">
         <!-- Character Selection Screen -->
         <div id="characterSelection" class="character-selection">
-            <h1 class="selection-title">Choose Your Character</h1>
+            <h1 class="selection-title">Elige Tu Personaje</h1>
             <div class="character-cards">
                 <div class="character-card" data-character="red">
                     <div class="character-preview" id="red-preview"></div>
                     <h2>Red</h2>
-                    <button class="select-btn">Select</button>
+                    <button class="select-btn">Seleccionar</button>
                 </div>
                 <div class="character-card" data-character="bumblebee">
                     <div class="character-preview" id="bumblebee-preview"></div>
                     <h2>Bumblebee</h2>
-                    <button class="select-btn">Select</button>
+                    <button class="select-btn">Seleccionar</button>
                 </div>
             </div>
         </div>
 
         <!-- Background Selection Screen (hidden initially) -->
         <div id="backgroundSelection" class="background-selection" style="display: none;">
-            <h1 class="selection-title">Choose Your Background</h1>
+            <h1 class="selection-title">Elige Tu Fondo</h1>
             <div class="background-cards">
                 <div class="background-card" data-background="desert">
                     <div class="background-preview" style="background-image: url('assets/desert.jpg');"></div>
-                    <h2>Desert</h2>
-                    <button class="select-btn">Select</button>
+                    <h2>Desierto</h2>
+                    <button class="select-btn">Seleccionar</button>
                 </div>
                 <div class="background-card" data-background="snow">
                     <div class="background-preview" style="background-image: url('assets/snow.jpg');"></div>
-                    <h2>Snow</h2>
-                    <button class="select-btn">Select</button>
+                    <h2>Nieve</h2>
+                    <button class="select-btn">Seleccionar</button>
                 </div>
             </div>
         </div>
@@ -59,8 +59,8 @@
         <div id="loadingScreen" class="loading-screen" style="display: none;">
             <div class="loading-content">
                 <div class="loading-spinner"></div>
-                <h2 class="loading-title">Loading Your Character...</h2>
-                <p class="loading-subtitle">Preparing the 3D world</p>
+                <h2 class="loading-title">Cargando Tu Personaje...</h2>
+                <p class="loading-subtitle">Preparando el mundo 3D</p>
             </div>
         </div>
 
