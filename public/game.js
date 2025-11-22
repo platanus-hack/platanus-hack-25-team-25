@@ -175,9 +175,6 @@ import { HandLandmarker, FilesetResolver } from 'https://esm.sh/@mediapipe/tasks
 import { AudioManager } from './audioManager.js'; // Import the AudioManager
 import { SpeechManager } from './SpeechManager.js'; // Import SpeechManager
 
-// Constants
-var ONBOARDING_VIDEO_DURATION_SECONDS = 60; // Duration of onboarding video in seconds
-
 export var Game = /*#__PURE__*/ function() {
     "use strict";
     function Game(renderDiv, selectedCharacter, selectedBackground, onReadyCallback) {
@@ -192,11 +189,7 @@ export var Game = /*#__PURE__*/ function() {
         this.camera = null;
         this.renderer = null;
         this.videoElement = null;
-        this.onboardingVideoElement = null;
         this.gameContainer = null;
-        this.onboardingContainer = null;
-        this.progressBarFill = null;
-        this.progressBarInterval = null;
         this.handLandmarker = null;
         this.lastVideoTime = -1;
         this.hands = []; // Stores data about detected hands (landmarks, anchor position, line group)
@@ -331,29 +324,6 @@ export var Game = /*#__PURE__*/ function() {
                                 if (_this.onReadyCallback) {
                                     _this.onReadyCallback();
                                 }
-                                // Start onboarding video 2 seconds after game loads
-                                var videoStartDelay = 2000;
-                                setTimeout(function() {
-                                    if (_this.onboardingVideoElement) {
-                                        _this.onboardingVideoElement.play().catch(function(err) {
-                                            console.error('Error playing onboarding video:', err);
-                                        });
-                                        // Start progress bar animation
-                                        _this._startProgressBar();
-                                    }
-                                }, videoStartDelay);
-                                // Hide right side after video duration (video starts 2s after load)
-                                var totalDelay = videoStartDelay + (ONBOARDING_VIDEO_DURATION_SECONDS * 1000);
-                                setTimeout(function() {
-                                    if (_this.onboardingContainer && _this.gameContainer) {
-                                        _this.onboardingContainer.style.display = 'none';
-                                        _this.gameContainer.style.width = '100%';
-                                        // Resize immediately after the change
-                                        requestAnimationFrame(function() {
-                                            _this._onResize();
-                                        });
-                                    }
-                                }, totalDelay);
                                 return [
                                     2
                                 ];
@@ -373,58 +343,13 @@ export var Game = /*#__PURE__*/ function() {
                 this.renderDiv.style.background = 'transparent';
                 this.renderDiv.style.display = 'flex';
                 
-                // Game container (left half)
+                // Game container (full width)
                 this.gameContainer = document.createElement('div');
                 this.gameContainer.style.position = 'relative';
-                this.gameContainer.style.width = '50%';
+                this.gameContainer.style.width = '100%';
                 this.gameContainer.style.height = '100%';
                 this.gameContainer.style.overflow = 'hidden';
                 this.renderDiv.appendChild(this.gameContainer);
-                
-                // Onboarding container (right half)
-                this.onboardingContainer = document.createElement('div');
-                this.onboardingContainer.style.position = 'relative';
-                this.onboardingContainer.style.width = '50%';
-                this.onboardingContainer.style.height = '100%';
-                this.onboardingContainer.style.overflow = 'hidden';
-                this.onboardingContainer.style.backgroundColor = '#000';
-                this.renderDiv.appendChild(this.onboardingContainer);
-                
-                // Onboarding video
-                this.onboardingVideoElement = document.createElement('video');
-                this.onboardingVideoElement.src = 'onboarding.mp4';
-                this.onboardingVideoElement.style.width = '100%';
-                this.onboardingVideoElement.style.height = '100%';
-                this.onboardingVideoElement.style.objectFit = 'cover';
-                this.onboardingVideoElement.playsInline = true;
-                this.onboardingVideoElement.muted = false;
-                this.onboardingVideoElement.controls = false;
-                this.onboardingContainer.appendChild(this.onboardingVideoElement);
-                
-                // Progress bar container
-                this.progressBarContainer = document.createElement('div');
-                this.progressBarContainer.style.position = 'absolute';
-                this.progressBarContainer.style.bottom = '20px';
-                this.progressBarContainer.style.left = '50%';
-                this.progressBarContainer.style.transform = 'translateX(-50%)';
-                this.progressBarContainer.style.width = '90%';
-                this.progressBarContainer.style.height = '4px';
-                this.progressBarContainer.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-                this.progressBarContainer.style.borderRadius = '2px';
-                this.progressBarContainer.style.zIndex = '10';
-                this.onboardingContainer.appendChild(this.progressBarContainer);
-                
-                // Progress bar fill
-                this.progressBarFill = document.createElement('div');
-                this.progressBarFill.style.position = 'absolute';
-                this.progressBarFill.style.left = '0';
-                this.progressBarFill.style.top = '0';
-                this.progressBarFill.style.height = '100%';
-                this.progressBarFill.style.width = '0%';
-                this.progressBarFill.style.backgroundColor = '#ffffff';
-                this.progressBarFill.style.borderRadius = '2px';
-                this.progressBarFill.style.transition = 'width 0.1s linear';
-                this.progressBarContainer.appendChild(this.progressBarFill);
                 
                 // User webcam video (corner video)
                 this.videoElement = document.createElement('video');
@@ -1434,25 +1359,7 @@ export var Game = /*#__PURE__*/ function() {
         },
         {
             // _updateScoreDisplay method removed.
-            key: "_startProgressBar",
-            value: function _startProgressBar() {
-                var _this = this;
-                var startTime = Date.now();
-                var duration = ONBOARDING_VIDEO_DURATION_SECONDS * 1000;
-                this.progressBarInterval = setInterval(function() {
-                    var elapsed = Date.now() - startTime;
-                    var progress = Math.min((elapsed / duration) * 100, 100);
-                    if (_this.progressBarFill) {
-                        _this.progressBarFill.style.width = progress + '%';
-                    }
-                    if (progress >= 100) {
-                        if (_this.progressBarInterval) {
-                            clearInterval(_this.progressBarInterval);
-                            _this.progressBarInterval = null;
-                        }
-                    }
-                }, 50);
-            }
+            // _startProgressBar method removed.
         },
         {
             key: "_onResize",
