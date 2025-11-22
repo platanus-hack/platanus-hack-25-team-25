@@ -174,9 +174,7 @@ import { GLTFLoader } from 'three/loaders/GLTFLoader.js';
 import { HandLandmarker, FilesetResolver } from 'https://esm.sh/@mediapipe/tasks-vision@0.10.14';
 import { AudioManager } from './audioManager.js'; // Import the AudioManager
 import { SpeechManager } from './SpeechManager.js'; // Import SpeechManager
-
-// Constants
-var ONBOARDING_VIDEO_DURATION_SECONDS = 60; // Duration of onboarding video in seconds
+import { OnboardingHands } from './OnboardingHands.js'; // Import OnboardingHands
 
 export var Game = /*#__PURE__*/ function() {
     "use strict";
@@ -192,11 +190,7 @@ export var Game = /*#__PURE__*/ function() {
         this.camera = null;
         this.renderer = null;
         this.videoElement = null;
-        this.onboardingVideoElement = null;
         this.gameContainer = null;
-        this.onboardingContainer = null;
-        this.progressBarFill = null;
-        this.progressBarInterval = null;
         this.handLandmarker = null;
         this.lastVideoTime = -1;
         this.hands = []; // Stores data about detected hands (landmarks, anchor position, line group)
@@ -233,6 +227,7 @@ export var Game = /*#__PURE__*/ function() {
         this.speechManager = null;
         this.speechBubble = null;
         this.speechBubbleTimeout = null;
+        this.onboardingText = null; // Text element for onboarding instructions
         this.isSpeechActive = false; // Track if speech recognition is active for styling
         this.backendUrl = 'http://localhost:3000'; // Backend URL
         this.conversationId = 'default'; // Conversation ID for backend
@@ -285,6 +280,9 @@ export var Game = /*#__PURE__*/ function() {
         this.animationControlHandIndex = -1; // Index of the hand controlling animation scrolling
         this.animationControlInitialPinchY = null; // Initial Y position of the pinch for animation scrolling
         this.animationScrollThreshold = 40; // Pixels of vertical movement to trigger an animation change (Reduced from 50)
+        // Onboarding system
+        this.onboardingHands = null;
+        this.onboardingCompleted = false;
         // Initialize asynchronously
         this._init().catch(function(error) {
             console.error("Initialization failed:", error);
@@ -328,33 +326,23 @@ export var Game = /*#__PURE__*/ function() {
                                 window.addEventListener('resize', _this._onResize.bind(_this));
                                 _this.gameState = 'tracking';
                                 _this._animate();
+                                // Start onboarding
+                                if (_this.onboardingHands) {
+                                    _this.onboardingHands.startDragOnboarding();
+                                    console.log('Onboarding started: drag gesture');
+                                    // Show onboarding text
+                                    if (_this.onboardingText) {
+                                        _this.onboardingText.innerHTML = _this.onboardingHands.getCurrentInstructionText();
+                                        _this.onboardingText.style.display = 'block';
+                                        setTimeout(function() {
+                                            _this.onboardingText.style.opacity = '1';
+                                        }, 100);
+                                    }
+                                }
                                 // Call the ready callback if provided
                                 if (_this.onReadyCallback) {
                                     _this.onReadyCallback();
                                 }
-                                // Start onboarding video 2 seconds after game loads
-                                var videoStartDelay = 2000;
-                                setTimeout(function() {
-                                    if (_this.onboardingVideoElement) {
-                                        _this.onboardingVideoElement.play().catch(function(err) {
-                                            console.error('Error playing onboarding video:', err);
-                                        });
-                                        // Start progress bar animation
-                                        _this._startProgressBar();
-                                    }
-                                }, videoStartDelay);
-                                // Hide right side after video duration (video starts 2s after load)
-                                var totalDelay = videoStartDelay + (ONBOARDING_VIDEO_DURATION_SECONDS * 1000);
-                                setTimeout(function() {
-                                    if (_this.onboardingContainer && _this.gameContainer) {
-                                        _this.onboardingContainer.style.display = 'none';
-                                        _this.gameContainer.style.width = '100%';
-                                        // Resize immediately after the change
-                                        requestAnimationFrame(function() {
-                                            _this._onResize();
-                                        });
-                                    }
-                                }, totalDelay);
                                 return [
                                     2
                                 ];
@@ -374,58 +362,13 @@ export var Game = /*#__PURE__*/ function() {
                 this.renderDiv.style.background = 'transparent';
                 this.renderDiv.style.display = 'flex';
                 
-                // Game container (left half)
+                // Game container (full width)
                 this.gameContainer = document.createElement('div');
                 this.gameContainer.style.position = 'relative';
-                this.gameContainer.style.width = '50%';
+                this.gameContainer.style.width = '100%';
                 this.gameContainer.style.height = '100%';
                 this.gameContainer.style.overflow = 'hidden';
                 this.renderDiv.appendChild(this.gameContainer);
-                
-                // Onboarding container (right half)
-                this.onboardingContainer = document.createElement('div');
-                this.onboardingContainer.style.position = 'relative';
-                this.onboardingContainer.style.width = '50%';
-                this.onboardingContainer.style.height = '100%';
-                this.onboardingContainer.style.overflow = 'hidden';
-                this.onboardingContainer.style.backgroundColor = '#000';
-                this.renderDiv.appendChild(this.onboardingContainer);
-                
-                // Onboarding video
-                this.onboardingVideoElement = document.createElement('video');
-                this.onboardingVideoElement.src = 'onboarding.mp4';
-                this.onboardingVideoElement.style.width = '100%';
-                this.onboardingVideoElement.style.height = '100%';
-                this.onboardingVideoElement.style.objectFit = 'cover';
-                this.onboardingVideoElement.playsInline = true;
-                this.onboardingVideoElement.muted = false;
-                this.onboardingVideoElement.controls = false;
-                this.onboardingContainer.appendChild(this.onboardingVideoElement);
-                
-                // Progress bar container
-                this.progressBarContainer = document.createElement('div');
-                this.progressBarContainer.style.position = 'absolute';
-                this.progressBarContainer.style.bottom = '20px';
-                this.progressBarContainer.style.left = '50%';
-                this.progressBarContainer.style.transform = 'translateX(-50%)';
-                this.progressBarContainer.style.width = '90%';
-                this.progressBarContainer.style.height = '4px';
-                this.progressBarContainer.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-                this.progressBarContainer.style.borderRadius = '2px';
-                this.progressBarContainer.style.zIndex = '10';
-                this.onboardingContainer.appendChild(this.progressBarContainer);
-                
-                // Progress bar fill
-                this.progressBarFill = document.createElement('div');
-                this.progressBarFill.style.position = 'absolute';
-                this.progressBarFill.style.left = '0';
-                this.progressBarFill.style.top = '0';
-                this.progressBarFill.style.height = '100%';
-                this.progressBarFill.style.width = '0%';
-                this.progressBarFill.style.backgroundColor = '#ffffff';
-                this.progressBarFill.style.borderRadius = '2px';
-                this.progressBarFill.style.transition = 'width 0.1s linear';
-                this.progressBarContainer.appendChild(this.progressBarFill);
                 
                 // User webcam video (corner video)
                 this.videoElement = document.createElement('video');
@@ -496,6 +439,33 @@ export var Game = /*#__PURE__*/ function() {
                 this.speechBubble.style.pointerEvents = 'none';
                 this.speechBubble.innerHTML = "...";
                 this.gameContainer.appendChild(this.speechBubble);
+
+                // Onboarding instruction text (below speech bubble)
+                this.onboardingText = document.createElement('div');
+                this.onboardingText.id = 'onboarding-text';
+                this.onboardingText.style.position = 'absolute';
+                this.onboardingText.style.top = '80px'; // Debajo del speech bubble
+                this.onboardingText.style.left = '50%';
+                this.onboardingText.style.transform = 'translateX(-50%)';
+                this.onboardingText.style.padding = '20px 30px';
+                this.onboardingText.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+                this.onboardingText.style.border = '3px solid black';
+                this.onboardingText.style.borderRadius = '8px';
+                this.onboardingText.style.boxShadow = '6px 6px 0px rgba(0,0,0,1)';
+                this.onboardingText.style.color = '#000';
+                this.onboardingText.style.fontFamily = '"Arial Black", "Arial Bold", Arial, sans-serif';
+                this.onboardingText.style.fontSize = 'clamp(20px, 4vw, 28px)';
+                this.onboardingText.style.fontWeight = 'bold';
+                this.onboardingText.style.maxWidth = '85%';
+                this.onboardingText.style.textAlign = 'center';
+                this.onboardingText.style.zIndex = '26'; // Above speech bubble
+                this.onboardingText.style.opacity = '0'; // Hidden initially
+                this.onboardingText.style.transition = 'opacity 0.5s ease-in-out';
+                this.onboardingText.style.pointerEvents = 'none';
+                this.onboardingText.innerHTML = ""; // Will be set when onboarding starts
+                this.onboardingText.style.display = 'none'; // Hidden by default
+                this.gameContainer.appendChild(this.onboardingText);
+
                 // Animation buttons container
                 this.animationButtonsContainer = document.createElement('div');
                 this.animationButtonsContainer.id = 'animation-buttons-container';
@@ -734,6 +704,9 @@ export var Game = /*#__PURE__*/ function() {
                         17
                     ] // Connect base of fingers
                 ];
+                // Initialize OnboardingHands system
+                this.onboardingHands = new OnboardingHands(this.scene, this.camera);
+                console.log('OnboardingHands initialized');
             }
         },
         {
@@ -1566,25 +1539,7 @@ export var Game = /*#__PURE__*/ function() {
         },
         {
             // _updateScoreDisplay method removed.
-            key: "_startProgressBar",
-            value: function _startProgressBar() {
-                var _this = this;
-                var startTime = Date.now();
-                var duration = ONBOARDING_VIDEO_DURATION_SECONDS * 1000;
-                this.progressBarInterval = setInterval(function() {
-                    var elapsed = Date.now() - startTime;
-                    var progress = Math.min((elapsed / duration) * 100, 100);
-                    if (_this.progressBarFill) {
-                        _this.progressBarFill.style.width = progress + '%';
-                    }
-                    if (progress >= 100) {
-                        if (_this.progressBarInterval) {
-                            clearInterval(_this.progressBarInterval);
-                            _this.progressBarInterval = null;
-                        }
-                    }
-                }, 50);
-            }
+            // _startProgressBar method removed.
         },
         {
             key: "_onResize",
@@ -1746,6 +1701,51 @@ export var Game = /*#__PURE__*/ function() {
                 // Update animation mixer
                 if (this.animationMixer) {
                     this.animationMixer.update(deltaTime);
+                }
+                // Update onboarding animation
+                if (this.onboardingHands && !this.onboardingCompleted) {
+                    this.onboardingHands.update(deltaTime);
+                    // Check if user completed the current gesture
+                    if (this.onboardingHands.checkUserCompletion(this.hands)) {
+                        console.log('Onboarding step completed:', this.onboardingHands.currentStep);
+
+                        // Ocultar las manos de onboarding inmediatamente
+                        this.onboardingHands.leftHandGroup.visible = false;
+                        this.onboardingHands.rightHandGroup.visible = false;
+
+                        // Add delay before transitioning to next step
+                        var _this = this;
+                        setTimeout(function() {
+                            // Try to advance to next step
+                            var hasNextStep = _this.onboardingHands.nextStep();
+                            if (hasNextStep) {
+                                // Change interaction mode based on the new step
+                                var newStep = _this.onboardingHands.currentStep;
+                                if (newStep === 'scaleUp' || newStep === 'scaleDown') {
+                                    _this._setInteractionMode('scale');
+                                } else if (newStep === 'drag') {
+                                    _this._setInteractionMode('drag');
+                                }
+
+                                // Update instruction text for next step
+                                if (_this.onboardingText) {
+                                    _this.onboardingText.innerHTML = _this.onboardingHands.getCurrentInstructionText();
+                                }
+                            } else {
+                                // All steps completed
+                                console.log('Onboarding fully completed!');
+                                _this.onboardingCompleted = true;
+                                _this.onboardingHands.stop();
+                                // Hide onboarding text
+                                if (_this.onboardingText) {
+                                    _this.onboardingText.style.opacity = '0';
+                                    setTimeout(function() {
+                                        _this.onboardingText.style.display = 'none';
+                                    }, 500);
+                                }
+                            }
+                        }, 1200); // 1.2 segundos de delay
+                    }
                 }
                 // Bounding box helper visibility logic REMOVED
                 // _updateGhosts and _updateParticles calls removed.
