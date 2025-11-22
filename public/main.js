@@ -4,8 +4,10 @@ import { GLTFLoader } from 'three/loaders/GLTFLoader.js';
 
 // Character Selection Logic
 var characterSelection = document.getElementById('characterSelection');
+var backgroundSelection = document.getElementById('backgroundSelection');
 var renderDiv = document.getElementById('renderDiv');
 var selectedCharacter = null;
+var selectedBackground = null;
 var game = null;
 
 // Create preview scenes for each character
@@ -73,16 +75,43 @@ createCharacterPreview('red', 'red-preview');
 createCharacterPreview('bumblebee', 'bumblebee-preview');
 
 // Handle character selection
-var selectButtons = document.querySelectorAll('.select-btn');
-selectButtons.forEach(function(button) {
+var characterSelectButtons = document.querySelectorAll('#characterSelection .select-btn');
+characterSelectButtons.forEach(function(button) {
     button.addEventListener('click', function(e) {
         var card = e.target.closest('.character-card');
         var chosenCharacter = card.getAttribute('data-character');
-        selectedCharacter = chosenCharacter; // Also update the global variable
+        selectedCharacter = chosenCharacter;
         console.log('Character selected:', chosenCharacter);
 
         // Hide character selection screen
         characterSelection.style.display = 'none';
+
+        // Show background selection screen
+        if (backgroundSelection) {
+            backgroundSelection.style.display = 'flex';
+        }
+    });
+});
+
+// Handle background selection
+var backgroundSelectButtons = document.querySelectorAll('#backgroundSelection .select-btn');
+backgroundSelectButtons.forEach(function(button) {
+    button.addEventListener('click', function(e) {
+        var card = e.target.closest('.background-card');
+        var chosenBackground = card.getAttribute('data-background');
+        selectedBackground = chosenBackground;
+        console.log('Background selected:', chosenBackground);
+
+        // Hide background selection screen
+        if (backgroundSelection) {
+            backgroundSelection.style.display = 'none';
+        }
+
+        // Show loading screen
+        var loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.style.display = 'flex';
+        }
 
         // Show game screen
         renderDiv.style.display = 'block';
@@ -92,11 +121,18 @@ selectButtons.forEach(function(button) {
             if (!renderDiv) {
                 console.error('Fatal Error: renderDiv element not found.');
             } else {
-                console.log('Initializing Game with character:', chosenCharacter);
-                game = new Game(renderDiv, chosenCharacter);
+                console.log('Initializing Game with character:', selectedCharacter, 'and background:', selectedBackground);
+                game = new Game(renderDiv, selectedCharacter, selectedBackground, function() {
+                    // Callback when game is fully loaded
+                    if (loadingScreen) {
+                        loadingScreen.classList.add('hidden');
+                        setTimeout(function() {
+                            loadingScreen.style.display = 'none';
+                        }, 500); // Wait for fade-out animation
+                    }
+                });
                 game.start();
             }
         }, 100);
-
     });
 });

@@ -1,1 +1,4 @@
-The main implementation is currently in /public where we have the HTML, JS, CSS files for the web app and everything needed for the implementation
+The main implementation is currently in /public where we have the HTML, JS, CSS files for the web app and everything needed for the implementation.
+
+Do not overcomment, ONLY add comments when they are strictly necessary to understand the code.
+Same with the logs, only keep the essential; if you're logging to debug, make sure to remove them when done debugging.

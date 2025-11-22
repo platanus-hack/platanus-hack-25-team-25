@@ -145,6 +145,127 @@
     box-shadow: 2px 2px 0px black;
 }
 
+/* Loading Screen */
+.loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 1;
+    transition: opacity 0.5s ease-out;
+}
+
+.loading-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.loading-content {
+    text-align: center;
+    color: white;
+}
+
+.loading-spinner {
+    width: 80px;
+    height: 80px;
+    border: 6px solid rgba(255, 255, 255, 0.3);
+    border-top: 6px solid white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 30px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-title {
+    font-family: "Arial", "Helvetica Neue", Helvetica, sans-serif;
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: bold;
+    margin: 0 0 10px 0;
+    text-shadow: 3px 3px 0px rgba(0, 0, 0, 0.3);
+}
+
+.loading-subtitle {
+    font-family: "Arial", "Helvetica Neue", Helvetica, sans-serif;
+    font-size: clamp(16px, 3vw, 24px);
+    margin: 0;
+    opacity: 0.9;
+    text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.2);
+}
+
+/* Background Selection Screen */
+.background-selection {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.background-cards {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    max-width: 90%;
+}
+
+.background-card {
+    background: white;
+    border: 4px solid black;
+    border-radius: 12px;
+    padding: 30px;
+    width: 300px;
+    box-shadow: 6px 6px 0px black;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.background-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 8px 8px 0px black;
+}
+
+.background-preview {
+    width: 100%;
+    height: 250px;
+    background-size: cover;
+    background-position: center;
+    border: 3px solid black;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+}
+
+.background-card h2 {
+    font-family: "Arial", "Helvetica Neue", Helvetica, sans-serif;
+    font-size: 28px;
+    font-weight: bold;
+    color: black;
+    margin: 10px 0 20px 0;
+    text-transform: capitalize;
+}
+
 @media (max-width: 768px) {
     .character-cards {
         gap: 20px;
@@ -157,5 +278,24 @@
 
     .character-preview {
         height: 200px;
+    }
+
+    .background-cards {
+        gap: 20px;
+    }
+
+    .background-card {
+        width: 250px;
+        padding: 20px;
+    }
+
+    .background-preview {
+        height: 200px;
+    }
+
+    .loading-spinner {
+        width: 60px;
+        height: 60px;
+        border-width: 5px;
     }
 }

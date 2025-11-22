@@ -174,18 +174,29 @@ import { GLTFLoader } from 'three/loaders/GLTFLoader.js';
 import { HandLandmarker, FilesetResolver } from 'https://esm.sh/@mediapipe/tasks-vision@0.10.14';
 import { AudioManager } from './audioManager.js'; // Import the AudioManager
 import { SpeechManager } from './SpeechManager.js'; // Import SpeechManager
+
+// Constants
+var ONBOARDING_VIDEO_DURATION_SECONDS = 60; // Duration of onboarding video in seconds
+
 export var Game = /*#__PURE__*/ function() {
     "use strict";
-    function Game(renderDiv, selectedCharacter) {
+    function Game(renderDiv, selectedCharacter, selectedBackground, onReadyCallback) {
         var _this = this;
         _class_call_check(this, Game);
         this.renderDiv = renderDiv;
         this.selectedCharacter = selectedCharacter || 'red'; // Default to 'red' if not provided
-        console.log('Game initialized with selectedCharacter:', this.selectedCharacter);
+        this.selectedBackground = selectedBackground || 'desert'; // Default to 'desert' if not provided
+        this.onReadyCallback = onReadyCallback || null; // Callback when game is fully loaded
+        console.log('Game initialized with selectedCharacter:', this.selectedCharacter, 'and selectedBackground:', this.selectedBackground);
         this.scene = null;
         this.camera = null;
         this.renderer = null;
         this.videoElement = null;
+        this.onboardingVideoElement = null;
+        this.gameContainer = null;
+        this.onboardingContainer = null;
+        this.progressBarFill = null;
+        this.progressBarInterval = null;
         this.handLandmarker = null;
         this.lastVideoTime = -1;
         this.hands = []; // Stores data about detected hands (landmarks, anchor position, line group)
@@ -213,6 +224,7 @@ export var Game = /*#__PURE__*/ function() {
         this.smoothingFactor = 0.4; // Alpha for exponential smoothing (0 < alpha <= 1). Smaller = more smoothing.
         this.loadedModels = {};
         this.pandaModel = null; // Add reference for the Panda model
+        this.dragonModel = null; // Add reference for the Dragon model
         this.animationMixer = null; // For model animations
         this.animationClips = []; // To store all animation clips from the model
         this.animationActions = {}; // To store animation actions by name or index
@@ -313,8 +325,45 @@ export var Game = /*#__PURE__*/ function() {
                                 _this.speechManager.requestPermissionAndStart(); // Start speech recognition
                                 _this.clock.start(); // Start the main clock as game starts automatically
                                 window.addEventListener('resize', _this._onResize.bind(_this));
-                                _this.gameState = 'tracking'; // Change state to tracking to start immediately
-                                _this._animate(); // Start the animation loop (it will check state)
+                                _this.gameState = 'tracking';
+                                _this._animate();
+                                // Call the ready callback if provided
+                                if (_this.onReadyCallback) {
+                                    _this.onReadyCallback();
+                                }
+                                // Start onboarding video 2 seconds after game loads
+                                var videoStartDelay = 2000;
+                                setTimeout(function() {
+                                    if (_this.onboardingVideoElement) {
+                                        _this.onboardingVideoElement.play().catch(function(err) {
+                                            console.error('Error playing onboarding video:', err);
+                                        });
+                                        // Start progress bar animation
+                                        _this._startProgressBar();
+                                    }
+                                }, videoStartDelay);
+                                // Shrink right side after video duration (video starts 2s after load)
+                                var totalDelay = videoStartDelay + (ONBOARDING_VIDEO_DURATION_SECONDS * 1000);
+                                setTimeout(function() {
+                                    if (_this.onboardingContainer && _this.gameContainer) {
+                                        _this.onboardingContainer.style.width = '0%';
+                                        _this.gameContainer.style.width = '100%';
+                                        // Continuously resize during the 1s transition using requestAnimationFrame
+                                        var startTime = Date.now();
+                                        var transitionDuration = 1000; // 1 second transition
+                                        var resizeLoop = function() {
+                                            var elapsed = Date.now() - startTime;
+                                            if (elapsed < transitionDuration + 100) {
+                                                _this._onResize();
+                                                requestAnimationFrame(resizeLoop);
+                                            } else {
+                                                // Final resize after transition completes
+                                                _this._onResize();
+                                            }
+                                        };
+                                        requestAnimationFrame(resizeLoop);
+                                    }
+                                }, totalDelay);
                                 return [
                                     2
                                 ];
@@ -328,12 +377,68 @@ export var Game = /*#__PURE__*/ function() {
             value: function _setupDOM() {
                 var _this = this;
                 this.renderDiv.style.position = 'relative';
-                this.renderDiv.style.width = '100vw'; // Use viewport units for fullscreen
+                this.renderDiv.style.width = '100vw';
                 this.renderDiv.style.height = '100vh';
                 this.renderDiv.style.overflow = 'hidden';
-                this.renderDiv.style.background = 'transparent'; // Empty background
-                // Start Screen Overlay and related DOM elements (title, instructions, loading text) removed.
-                // --- End Start Screen Overlay ---
+                this.renderDiv.style.background = 'transparent';
+                this.renderDiv.style.display = 'flex';
+                
+                // Game container (left half)
+                this.gameContainer = document.createElement('div');
+                this.gameContainer.style.position = 'relative';
+                this.gameContainer.style.width = '50%';
+                this.gameContainer.style.height = '100%';
+                this.gameContainer.style.overflow = 'hidden';
+                this.gameContainer.style.transition = 'width 1s ease-in-out';
+                this.renderDiv.appendChild(this.gameContainer);
+                
+                // Onboarding container (right half)
+                this.onboardingContainer = document.createElement('div');
+                this.onboardingContainer.style.position = 'relative';
+                this.onboardingContainer.style.width = '50%';
+                this.onboardingContainer.style.height = '100%';
+                this.onboardingContainer.style.overflow = 'hidden';
+                this.onboardingContainer.style.transition = 'width 1s ease-in-out';
+                this.onboardingContainer.style.backgroundColor = '#000';
+                this.renderDiv.appendChild(this.onboardingContainer);
+                
+                // Onboarding video
+                this.onboardingVideoElement = document.createElement('video');
+                this.onboardingVideoElement.src = 'onboarding.mp4';
+                this.onboardingVideoElement.style.width = '100%';
+                this.onboardingVideoElement.style.height = '100%';
+                this.onboardingVideoElement.style.objectFit = 'cover';
+                this.onboardingVideoElement.playsInline = true;
+                this.onboardingVideoElement.muted = false;
+                this.onboardingVideoElement.controls = false;
+                this.onboardingContainer.appendChild(this.onboardingVideoElement);
+                
+                // Progress bar container
+                this.progressBarContainer = document.createElement('div');
+                this.progressBarContainer.style.position = 'absolute';
+                this.progressBarContainer.style.bottom = '20px';
+                this.progressBarContainer.style.left = '50%';
+                this.progressBarContainer.style.transform = 'translateX(-50%)';
+                this.progressBarContainer.style.width = '90%';
+                this.progressBarContainer.style.height = '4px';
+                this.progressBarContainer.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+                this.progressBarContainer.style.borderRadius = '2px';
+                this.progressBarContainer.style.zIndex = '10';
+                this.onboardingContainer.appendChild(this.progressBarContainer);
+                
+                // Progress bar fill
+                this.progressBarFill = document.createElement('div');
+                this.progressBarFill.style.position = 'absolute';
+                this.progressBarFill.style.left = '0';
+                this.progressBarFill.style.top = '0';
+                this.progressBarFill.style.height = '100%';
+                this.progressBarFill.style.width = '0%';
+                this.progressBarFill.style.backgroundColor = '#ffffff';
+                this.progressBarFill.style.borderRadius = '2px';
+                this.progressBarFill.style.transition = 'width 0.1s linear';
+                this.progressBarContainer.appendChild(this.progressBarFill);
+                
+                // User webcam video (corner video)
                 this.videoElement = document.createElement('video');
                 this.videoElement.style.position = 'absolute';
                 this.videoElement.style.bottom = '10px';
@@ -348,8 +453,8 @@ export var Game = /*#__PURE__*/ function() {
                 this.videoElement.autoplay = true;
                 this.videoElement.muted = true; // Mute video to avoid feedback loops if audio was captured
                 this.videoElement.playsInline = true;
-                this.videoElement.style.zIndex = '1'; // Behind THREE canvas
-                this.renderDiv.appendChild(this.videoElement);
+                this.videoElement.style.zIndex = '3';
+                this.gameContainer.appendChild(this.videoElement);
                 // Container for Status text (formerly Game Over) and restart hint
                 this.gameOverContainer = document.createElement('div');
                 this.gameOverContainer.style.position = 'absolute';
@@ -377,7 +482,7 @@ export var Game = /*#__PURE__*/ function() {
                 this.restartHintText.style.fontWeight = 'normal';
                 this.restartHintText.style.opacity = '0.8'; // Slightly faded
                 this.gameOverContainer.appendChild(this.restartHintText);
-                this.renderDiv.appendChild(this.gameOverContainer);
+                this.gameContainer.appendChild(this.gameOverContainer);
                 // --- Speech Bubble ---
                 this.speechBubble = document.createElement('div');
                 this.speechBubble.id = 'speech-bubble';
@@ -399,9 +504,9 @@ export var Game = /*#__PURE__*/ function() {
                 this.speechBubble.style.opacity = '0'; // Hidden initially, fade in
                 // Added boxShadow, border, padding, fontSize, top to transition for smooth active state changes
                 this.speechBubble.style.transition = 'opacity 0.5s ease-in-out, transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out, border 0.3s ease-in-out, padding 0.3s ease-in-out, font-size 0.3s ease-in-out, top 0.3s ease-in-out';
-                this.speechBubble.style.pointerEvents = 'none'; // Not interactive
-                this.speechBubble.innerHTML = "..."; // Default text
-                this.renderDiv.appendChild(this.speechBubble);
+                this.speechBubble.style.pointerEvents = 'none';
+                this.speechBubble.innerHTML = "...";
+                this.gameContainer.appendChild(this.speechBubble);
                 // Animation buttons container
                 this.animationButtonsContainer = document.createElement('div');
                 this.animationButtonsContainer.id = 'animation-buttons-container';
@@ -415,9 +520,9 @@ export var Game = /*#__PURE__*/ function() {
                 this.animationButtonsContainer.style.flexDirection = 'column'; // Arrange buttons in a column
                 this.animationButtonsContainer.style.gap = '4px'; // Reduced gap for tighter vertical layout
                 this.animationButtonsContainer.style.opacity = '0'; // Start fully transparent for fade-in
-                this.animationButtonsContainer.style.transition = 'opacity 0.3s ease-in-out'; // Smooth fade transition
-                this.animationButtonsContainer.style.display = 'none'; // Initially hidden (will be set to flex by logic)
-                this.renderDiv.appendChild(this.animationButtonsContainer);
+                this.animationButtonsContainer.style.transition = 'opacity 0.3s ease-in-out';
+                this.animationButtonsContainer.style.display = 'none';
+                this.gameContainer.appendChild(this.animationButtonsContainer);
                 // Interaction Mode UI Container
                 this.interactionModeContainer = document.createElement('div');
                 this.interactionModeContainer.id = 'interaction-mode-container';
@@ -428,7 +533,7 @@ export var Game = /*#__PURE__*/ function() {
                 this.interactionModeContainer.style.display = 'flex';
                 this.interactionModeContainer.style.flexDirection = 'column';
                 this.interactionModeContainer.style.gap = '4px';
-                this.renderDiv.appendChild(this.interactionModeContainer);
+                this.gameContainer.appendChild(this.interactionModeContainer);
                 // Create interaction mode buttons
                 [
                     'Drag',
@@ -462,9 +567,19 @@ export var Game = /*#__PURE__*/ function() {
             key: "_setupThree",
             value: function _setupThree() {
                 var _this_interactionModeColors_this_interactionMode;
-                var width = this.renderDiv.clientWidth;
-                var height = this.renderDiv.clientHeight;
+                var _this = this;
+                var width = this.gameContainer.clientWidth;
+                var height = this.gameContainer.clientHeight;
                 this.scene = new THREE.Scene();
+                // Load background texture
+                var textureLoader = new THREE.TextureLoader();
+                var backgroundPath = 'assets/' + this.selectedBackground + '.jpg';
+                textureLoader.load(backgroundPath, function(texture) {
+                    _this.scene.background = texture;
+                    console.log('Background loaded:', backgroundPath);
+                }, undefined, function(error) {
+                    console.error('Error loading background:', error);
+                });
                 // Using OrthographicCamera for a 2D-like overlay effect
                 this.camera = new THREE.OrthographicCamera(width / -2, width / 2, height / 2, height / -2, 1, 2000); // Increased far plane
                 this.camera.position.z = 100; // Position along Z doesn't change scale in Ortho
@@ -477,8 +592,14 @@ export var Game = /*#__PURE__*/ function() {
                 this.renderer.domElement.style.position = 'absolute';
                 this.renderer.domElement.style.top = '0';
                 this.renderer.domElement.style.left = '0';
-                this.renderer.domElement.style.zIndex = '2'; // Canvas on top of video (hand tips visible)
-                this.renderDiv.appendChild(this.renderer.domElement);
+                this.renderer.domElement.style.width = '100%';
+                this.renderer.domElement.style.height = '100%';
+                this.renderer.domElement.style.zIndex = '2';
+                this.gameContainer.appendChild(this.renderer.domElement);
+                
+                // Store reference to gameContainer for resize calculations
+                this._gameContainerWidth = width;
+                this._gameContainerHeight = height;
                 var ambientLight = new THREE.AmbientLight(0xffffff, 1.5); // Increased intensity
                 this.scene.add(ambientLight);
                 var directionalLight = new THREE.DirectionalLight(0xffffff, 1.8); // Increased intensity
@@ -699,23 +820,19 @@ export var Game = /*#__PURE__*/ function() {
                                             var center = box.getCenter(new THREE.Vector3());
                                             var maxDimension = Math.max(size.x, size.y, size.z);
                                             
-                                            // Different scales for different characters (matching preview logic)
                                             var scale;
                                             if (_this.selectedCharacter === 'bumblebee') {
-                                                // Bumblebee is a Transformer - should be bigger
-                                                scale = 180 / maxDimension;
+                                                scale = 420 / maxDimension;
                                             } else {
-                                                // Red is an Angry Bird - smaller character
-                                                scale = 130 / maxDimension;
+                                                scale = 260 / maxDimension;
                                             }
                                             
                                             _this.pandaModel.scale.set(scale, scale, scale);
                                             
-                                            // Position the model: center horizontally, adjust Y based on model center, Z in front of hands
-                                            var sceneHeight = _this.renderDiv.clientHeight;
+                                            var sceneHeight = _this.gameContainer.clientHeight;
                                             _this.pandaModel.position.set(
                                                 -center.x * scale, 
-                                                -center.y * scale + (sceneHeight * -0.45), 
+                                                -center.y * scale - (sceneHeight * 0.1), // A bit lower than before
                                                 -1000
                                             );
                                             
@@ -1001,8 +1118,8 @@ export var Game = /*#__PURE__*/ function() {
                                             var pinchX = hand.pinchPointScreen.x;
                                             var pinchY = hand.pinchPointScreen.y;
                                             // Convert 2D screen pinch point (origin center) to NDC (Normalized Device Coords, -1 to 1)
-                                            var ndcX = pinchX / (_this1.renderDiv.clientWidth / 2);
-                                            var ndcY = pinchY / (_this1.renderDiv.clientHeight / 2);
+                                            var ndcX = pinchX / (_this1.gameContainer.clientWidth / 2);
+                                            var ndcY = pinchY / (_this1.gameContainer.clientHeight / 2);
                                             var pinchPoint3DWorld = new THREE.Vector3(ndcX, ndcY, 0.5); // Start with a neutral NDC Z
                                             pinchPoint3DWorld.unproject(_this1.camera);
                                             pinchPoint3DWorld.z = _this1.modelGrabStartDepth; // Force Z to the grab depth
@@ -1014,8 +1131,8 @@ export var Game = /*#__PURE__*/ function() {
                                             // Update model position based on pinch
                                             var currentPinchX = hand.pinchPointScreen.x;
                                             var currentPinchY = hand.pinchPointScreen.y;
-                                            var currentNdcX = currentPinchX / (_this1.renderDiv.clientWidth / 2);
-                                            var currentNdcY = currentPinchY / (_this1.renderDiv.clientHeight / 2);
+                                            var currentNdcX = currentPinchX / (_this1.gameContainer.clientWidth / 2);
+                                            var currentNdcY = currentPinchY / (_this1.gameContainer.clientHeight / 2);
                                             var newPinchPoint3DWorld = new THREE.Vector3(currentNdcX, currentNdcY, 0.5);
                                             newPinchPoint3DWorld.unproject(_this1.camera);
                                             newPinchPoint3DWorld.z = _this1.modelGrabStartDepth; // Force Z to the original grab depth plane
@@ -1140,8 +1257,8 @@ export var Game = /*#__PURE__*/ function() {
                         var results = this.handLandmarker.detectForVideo(this.videoElement, performance.now());
                         var videoParams = this._getVisibleVideoParameters();
                         if (!videoParams) return;
-                        var canvasWidth = this.renderDiv.clientWidth;
-                        var canvasHeight = this.renderDiv.clientHeight;
+                        var canvasWidth = this.gameContainer.clientWidth;
+                        var canvasHeight = this.gameContainer.clientHeight;
                         for(var i = 0; i < this.hands.length; i++)_this1 = this, _loop(i);
                          // End of hand loop
                         // After processing both hands, if in scale mode and one hand stops pinching, explicitly stop scaling.
@@ -1195,8 +1312,8 @@ export var Game = /*#__PURE__*/ function() {
                     new THREE.Vector3(box.max.x, box.max.y, box.max.z)
                 ];
                 var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-                var canvasWidth = this.renderDiv.clientWidth;
-                var canvasHeight = this.renderDiv.clientHeight;
+                var canvasWidth = this.gameContainer.clientWidth;
+                var canvasHeight = this.gameContainer.clientHeight;
                 corners.forEach(function(corner) {
                     // Apply model's world transformation to the local bounding box corners
                     corner.applyMatrix4(_this.pandaModel.matrixWorld);
@@ -1228,8 +1345,8 @@ export var Game = /*#__PURE__*/ function() {
                 }
                 var vNatW = this.videoElement.videoWidth;
                 var vNatH = this.videoElement.videoHeight;
-                var rW = this.renderDiv.clientWidth;
-                var rH = this.renderDiv.clientHeight;
+                var rW = this.gameContainer.clientWidth;
+                var rH = this.gameContainer.clientHeight;
                 if (vNatW === 0 || vNatH === 0 || rW === 0 || rH === 0) return null;
                 var videoAR = vNatW / vNatH;
                 var renderDivAR = rW / rH;
@@ -1329,20 +1446,50 @@ export var Game = /*#__PURE__*/ function() {
         },
         {
             // _updateScoreDisplay method removed.
+            key: "_startProgressBar",
+            value: function _startProgressBar() {
+                var _this = this;
+                var startTime = Date.now();
+                var duration = ONBOARDING_VIDEO_DURATION_SECONDS * 1000;
+                this.progressBarInterval = setInterval(function() {
+                    var elapsed = Date.now() - startTime;
+                    var progress = Math.min((elapsed / duration) * 100, 100);
+                    if (_this.progressBarFill) {
+                        _this.progressBarFill.style.width = progress + '%';
+                    }
+                    if (progress >= 100) {
+                        if (_this.progressBarInterval) {
+                            clearInterval(_this.progressBarInterval);
+                            _this.progressBarInterval = null;
+                        }
+                    }
+                }, 50);
+            }
+        },
+        {
             key: "_onResize",
             value: function _onResize() {
-                var width = this.renderDiv.clientWidth;
-                var height = this.renderDiv.clientHeight;
-                // Update camera perspective
-                this.camera.left = width / -2;
-                this.camera.right = width / 2;
-                this.camera.top = height / 2;
-                this.camera.bottom = height / -2;
-                this.camera.updateProjectionMatrix();
-                // Update renderer size
-                this.renderer.setSize(width, height);
-                // Keep video element in corner with fixed size (no resize needed)
-            // Watermelon, Chad, GroundLine updates removed.
+                if (!this.gameContainer || !this.camera || !this.renderer) return;
+                // Force a reflow to ensure we get the latest dimensions
+                var containerRect = this.gameContainer.getBoundingClientRect();
+                var width = containerRect.width || this.gameContainer.clientWidth;
+                var height = containerRect.height || this.gameContainer.clientHeight;
+                
+                if (width > 0 && height > 0) {
+                    // Update camera perspective
+                    this.camera.left = width / -2;
+                    this.camera.right = width / 2;
+                    this.camera.top = height / 2;
+                    this.camera.bottom = height / -2;
+                    this.camera.updateProjectionMatrix();
+                    // Update renderer size - this will make the background expand to fill the new size
+                    this.renderer.setSize(width, height);
+                    // Ensure renderer canvas fills the container
+                    if (this.renderer.domElement) {
+                        this.renderer.domElement.style.width = '100%';
+                        this.renderer.domElement.style.height = '100%';
+                    }
+                }
             }
         },
         {
@@ -1876,8 +2023,8 @@ export var Game = /*#__PURE__*/ function() {
                         // 3. Scale and position the new model
                         var scale = 80;
                         _this.pandaModel.scale.set(scale, scale, scale);
-                        var sceneHeight = _this.renderDiv.clientHeight;
-                        _this.pandaModel.position.set(0, sceneHeight * -0.45, -1000);
+                        var sceneHeight = _this.gameContainer.clientHeight;
+                        _this.pandaModel.position.set(0, sceneHeight * 0.2, -1000); // Match the position
                         // 4. Add the new model to the scene
                         _this.scene.add(_this.pandaModel);
                         console.log('Added new model "'.concat(fileName, '" to scene.'));
@@ -1944,6 +2091,25 @@ export var Game = /*#__PURE__*/ function() {
                     console.error("Critical error during GLTF parsing setup for ".concat(fileName, ":"), e);
                     this._showError('Error setting up parser for "'.concat(fileName, '".'));
                 }
+            }
+        },
+        {
+            key: "_createDragon",
+            value: function _createDragon() {
+                var _this = this;
+                if (this.dragonModel && this.scene && this.scene.children.includes(this.dragonModel)) {
+                    return;
+                }
+                var gltfLoader = new GLTFLoader();
+                var modelPath = 'assets/dragon.gltf';
+                gltfLoader.load(modelPath, function(gltf) {
+                    _this.dragonModel = gltf.scene;
+                    if (_this.scene) {
+                        _this.scene.add(_this.dragonModel);
+                    }
+                }, undefined, function(error) {
+                    console.error('Error loading dragon model:', error);
+                });
             }
         }
     ]);
