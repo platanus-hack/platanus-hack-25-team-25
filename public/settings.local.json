@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(lsof -ti:3000)",
+      "Bash(lsof -ti:5173)",
+      "Bash(lsof -ti:8080)",
+      "Bash(npm start)",
+      "Bash(npm install)",
+      "Bash(lsof -ti:3001)",
+      "Bash(lsof -ti:8000)",
+      "Bash(kill -9 26521)",
+      "Bash(python3 -m http.server 8000)",
+      "Bash(cp -r assets .claude/)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

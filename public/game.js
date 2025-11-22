@@ -176,10 +176,12 @@ import { AudioManager } from './audioManager.js'; // Import the AudioManager
 import { SpeechManager } from './SpeechManager.js'; // Import SpeechManager
 export var Game = /*#__PURE__*/ function() {
     "use strict";
-    function Game(renderDiv) {
+    function Game(renderDiv, selectedCharacter) {
         var _this = this;
         _class_call_check(this, Game);
         this.renderDiv = renderDiv;
+        this.selectedCharacter = selectedCharacter || 'red'; // Default to 'red' if not provided
+        console.log('Game initialized with selectedCharacter:', this.selectedCharacter);
         this.scene = null;
         this.camera = null;
         this.renderer = null;
@@ -211,7 +213,7 @@ export var Game = /*#__PURE__*/ function() {
         this.smoothingFactor = 0.4; // Alpha for exponential smoothing (0 < alpha <= 1). Smaller = more smoothing.
         this.loadedModels = {};
         this.pandaModel = null; // Add reference for the Panda model
-        this.animationMixer = null; // For Stan model animations
+        this.animationMixer = null; // For model animations
         this.animationClips = []; // To store all animation clips from the model
         this.animationActions = {}; // To store animation actions by name or index
         this.currentAction = null; // To keep track of the currently playing animation action
@@ -329,21 +331,24 @@ export var Game = /*#__PURE__*/ function() {
                 this.renderDiv.style.width = '100vw'; // Use viewport units for fullscreen
                 this.renderDiv.style.height = '100vh';
                 this.renderDiv.style.overflow = 'hidden';
-                this.renderDiv.style.background = '#111'; // Fallback background
+                this.renderDiv.style.background = 'transparent'; // Empty background
                 // Start Screen Overlay and related DOM elements (title, instructions, loading text) removed.
                 // --- End Start Screen Overlay ---
                 this.videoElement = document.createElement('video');
                 this.videoElement.style.position = 'absolute';
-                this.videoElement.style.top = '0';
-                this.videoElement.style.left = '0';
-                this.videoElement.style.width = '100%';
-                this.videoElement.style.height = '100%';
+                this.videoElement.style.bottom = '10px';
+                this.videoElement.style.right = '10px';
+                this.videoElement.style.width = '250px'; // Fixed width for corner video
+                this.videoElement.style.height = '188px'; // Maintain 4:3 aspect ratio (250 * 3/4)
                 this.videoElement.style.objectFit = 'cover';
                 this.videoElement.style.transform = 'scaleX(-1)'; // Mirror view for intuitive control
+                this.videoElement.style.borderRadius = '8px'; // Rounded corners
+                this.videoElement.style.border = '2px solid rgba(255, 255, 255, 0.3)'; // Subtle border
+                this.videoElement.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)'; // Shadow for depth
                 this.videoElement.autoplay = true;
                 this.videoElement.muted = true; // Mute video to avoid feedback loops if audio was captured
                 this.videoElement.playsInline = true;
-                this.videoElement.style.zIndex = '0'; // Ensure video is behind THREE canvas
+                this.videoElement.style.zIndex = '1'; // Behind THREE canvas
                 this.renderDiv.appendChild(this.videoElement);
                 // Container for Status text (formerly Game Over) and restart hint
                 this.gameOverContainer = document.createElement('div');
@@ -472,7 +477,7 @@ export var Game = /*#__PURE__*/ function() {
                 this.renderer.domElement.style.position = 'absolute';
                 this.renderer.domElement.style.top = '0';
                 this.renderer.domElement.style.left = '0';
-                this.renderer.domElement.style.zIndex = '1'; // Canvas on top of video
+                this.renderer.domElement.style.zIndex = '2'; // Canvas on top of video (hand tips visible)
                 this.renderDiv.appendChild(this.renderer.domElement);
                 var ambientLight = new THREE.AmbientLight(0xffffff, 1.5); // Increased intensity
                 this.scene.add(ambientLight);
@@ -636,7 +641,9 @@ export var Game = /*#__PURE__*/ function() {
                                 return [
                                     4,
                                     new Promise(function(resolve, reject) {
-                                        gltfLoader.load('assets/Stan.gltf', function(gltf) {
+                                        var modelPath = 'assets/' + _this.selectedCharacter + '.gltf';
+                                        console.log('Loading model from path:', modelPath);
+                                        gltfLoader.load(modelPath, function(gltf) {
                                             _this.pandaModel = gltf.scene; // GLTFLoader returns an object with a 'scene' property
                                             _this.animationMixer = new THREE.AnimationMixer(_this.pandaModel);
                                             _this.animationClips = gltf.animations;
@@ -684,20 +691,40 @@ export var Game = /*#__PURE__*/ function() {
                                                     console.log("No animations found or default animation could not be played.");
                                                 }
                                             } else {
-                                                console.log("Stan model has no embedded animations.");
+                                                console.log("Model has no embedded animations.");
                                             }
-                                            // Scale and position the model
-                                            // These values might need adjustment based on the model's original size and pivot
-                                            var scale = 80; // This scale might need adjustment for Stan model
+                                            // Scale and position the model based on bounding box
+                                            var box = new THREE.Box3().setFromObject(_this.pandaModel);
+                                            var size = box.getSize(new THREE.Vector3());
+                                            var center = box.getCenter(new THREE.Vector3());
+                                            var maxDimension = Math.max(size.x, size.y, size.z);
+                                            
+                                            // Different scales for different characters (matching preview logic)
+                                            var scale;
+                                            if (_this.selectedCharacter === 'bumblebee') {
+                                                // Bumblebee is a Transformer - should be bigger
+                                                scale = 180 / maxDimension;
+                                            } else {
+                                                // Red is an Angry Bird - smaller character
+                                                scale = 130 / maxDimension;
+                                            }
+                                            
                                             _this.pandaModel.scale.set(scale, scale, scale);
-                                            // Position the model: X=center, Y=roughly bottom, Z=in front of hands
+                                            
+                                            // Position the model: center horizontally, adjust Y based on model center, Z in front of hands
                                             var sceneHeight = _this.renderDiv.clientHeight;
-                                            _this.pandaModel.position.set(0, sceneHeight * -0.45, -1000); // Updated Z to -1000
+                                            _this.pandaModel.position.set(
+                                                -center.x * scale, 
+                                                -center.y * scale + (sceneHeight * -0.45), 
+                                                -1000
+                                            );
+                                            
                                             _this.scene.add(_this.pandaModel);
-                                            console.log("Stan GLTF model loaded and added to scene.");
+                                            console.log("GLTF model loaded and added to scene. Scale:", scale, "Position:", _this.pandaModel.position);
                                             resolve();
                                         }, undefined, function(error) {
-                                            console.error('An error occurred while loading the Stan GLTF model:', error); // Updated log
+                                            console.error('An error occurred while loading the GLTF model for character "' + _this.selectedCharacter + '":', error);
+                                            console.error('Attempted to load:', modelPath);
                                             reject(error);
                                         });
                                     })
@@ -785,9 +812,7 @@ export var Game = /*#__PURE__*/ function() {
                                     new Promise(function(resolve) {
                                         _this.videoElement.onloadedmetadata = function() {
                                             console.log("Webcam metadata loaded.");
-                                            // Adjust video size slightly after metadata is loaded if needed, but CSS handles most
-                                            _this.videoElement.style.width = _this.renderDiv.clientWidth + 'px';
-                                            _this.videoElement.style.height = _this.renderDiv.clientHeight + 'px';
+                                            // Video size is fixed in corner, no resize needed
                                             resolve();
                                         };
                                     })
@@ -1001,7 +1026,7 @@ export var Game = /*#__PURE__*/ function() {
                                         }
                                     } else {
                                         if (prevIsPinching && _this1.grabbingHandIndex === i) {
-                                            console.log("Hand ".concat(i, " RELEASED Stan model (Drag mode) at position:"), _this1.pickedUpModel.position);
+                                            console.log("Hand ".concat(i, " RELEASED model (Drag mode) at position:"), _this1.pickedUpModel.position);
                                             _this1.grabbingHandIndex = -1;
                                             _this1.pickedUpModel = null;
                                         // if (this.grabMarker && this.pandaModel) this.grabMarker.visible = true; // Show marker when released - Grab marker removed
@@ -1316,9 +1341,7 @@ export var Game = /*#__PURE__*/ function() {
                 this.camera.updateProjectionMatrix();
                 // Update renderer size
                 this.renderer.setSize(width, height);
-                // Update video element size
-                this.videoElement.style.width = width + 'px';
-                this.videoElement.style.height = height + 'px';
+                // Keep video element in corner with fixed size (no resize needed)
             // Watermelon, Chad, GroundLine updates removed.
             }
         },
@@ -1926,3 +1949,4 @@ export var Game = /*#__PURE__*/ function() {
     ]);
     return Game;
 }();
+//oscar
