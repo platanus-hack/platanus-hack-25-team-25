@@ -225,6 +225,9 @@ export var Game = /*#__PURE__*/ function() {
         this.pickedUpModel = null; // Reference to the model being dragged
         this.modelDragOffset = new THREE.Vector3(); // Offset between model and pinch point in 3D
         this.modelGrabStartDepth = 0; // To store the model's Z depth when grabbed
+        this.loadedModels = []; // Array to store all loaded models
+        this.activeModelIndex = 0; // Index of the currently active model for interaction
+        this.modelHighlights = []; // Array to store highlight indicators for each model
         this.interactionMode = 'drag'; // 'drag', 'rotate', 'scale', 'animate' - Default to drag
         this.interactionModeButtons = {}; // To store references to mode buttons
         this.loadedDroppedModelData = null; // To temporarily store parsed GLTF data
@@ -330,6 +333,7 @@ export var Game = /*#__PURE__*/ function() {
                 this.renderDiv.style.height = '100vh';
                 this.renderDiv.style.overflow = 'hidden';
                 this.renderDiv.style.background = '#111'; // Fallback background
+                this.renderDiv.style.background = '#ffffff'; // White background
                 // Start Screen Overlay and related DOM elements (title, instructions, loading text) removed.
                 // --- End Start Screen Overlay ---
                 this.videoElement = document.createElement('video');
@@ -344,6 +348,20 @@ export var Game = /*#__PURE__*/ function() {
                 this.videoElement.muted = true; // Mute video to avoid feedback loops if audio was captured
                 this.videoElement.playsInline = true;
                 this.videoElement.style.zIndex = '0'; // Ensure video is behind THREE canvas
+                // Loom-style video in bottom-right corner
+                this.videoElement.style.bottom = '20px';
+                this.videoElement.style.right = '20px';
+                this.videoElement.style.width = '280px';
+                this.videoElement.style.height = '210px';
+                this.videoElement.style.objectFit = 'cover';
+                this.videoElement.style.transform = 'scaleX(-1)'; // Mirror view for intuitive control
+                this.videoElement.style.borderRadius = '12px';
+                this.videoElement.style.border = '3px solid #000';
+                this.videoElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                this.videoElement.autoplay = true;
+                this.videoElement.muted = true; // Mute video to avoid feedback loops if audio was captured
+                this.videoElement.playsInline = true;
+                this.videoElement.style.zIndex = '50'; // Above everything to be visible
                 this.renderDiv.appendChild(this.videoElement);
                 // Container for Status text (formerly Game Over) and restart hint
                 this.gameOverContainer = document.createElement('div');
@@ -450,6 +468,7 @@ export var Game = /*#__PURE__*/ function() {
                 });
                 this._updateInteractionModeButtonStyles(); // Apply initial styles
                 this._updateInstructionText(); // Set initial instruction text
+                // Model switching is now automatic based on hand proximity - no manual button needed
                 this._setupDragAndDrop(); // Add drag and drop listeners
             }
         },
@@ -633,78 +652,111 @@ export var Game = /*#__PURE__*/ function() {
                                     ,
                                     4
                                 ]);
+                                // Load models - add more models to the array to load them in parallel
                                 return [
                                     4,
-                                    new Promise(function(resolve, reject) {
-                                        gltfLoader.load('assets/Stan.gltf', function(gltf) {
-                                            _this.pandaModel = gltf.scene; // GLTFLoader returns an object with a 'scene' property
-                                            _this.animationMixer = new THREE.AnimationMixer(_this.pandaModel);
-                                            _this.animationClips = gltf.animations;
-                                            if (_this.animationClips && _this.animationClips.length) {
-                                                _this.animationClips.forEach(function(clip, index) {
-                                                    var action = _this.animationMixer.clipAction(clip);
-                                                    var actionName = clip.name || "Animation ".concat(index + 1);
-                                                    _this.animationActions[actionName] = action;
-                                                    // Create a button for this animation
-                                                    var button = document.createElement('button');
-                                                    button.innerText = actionName;
-                                                    button.style.padding = '5px 10px'; // Adjusted padding
-                                                    button.style.fontSize = '13px'; // Consistent font size
-                                                    button.style.backgroundColor = '#f0f0f0'; // Light grey default
-                                                    button.style.color = 'black';
-                                                    button.style.border = '2px solid black'; // Black border
-                                                    button.style.borderRadius = '4px'; // Sharper corners
-                                                    button.style.cursor = 'pointer';
-                                                    button.style.transition = 'background-color 0.2s ease, box-shadow 0.2s ease';
-                                                    button.style.boxShadow = '2px 2px 0px black'; // Default shadow
-                                                    button.addEventListener('click', function() {
-                                                        return _this._playAnimation(actionName);
+                                    Promise.all([
+                                        // Load Stan model
+                                        new Promise(function(resolve, reject) {
+                                            gltfLoader.load('assets/Stan.gltf', function(gltf) {
+                                                _this.pandaModel = gltf.scene;
+                                                _this.animationMixer = new THREE.AnimationMixer(_this.pandaModel);
+                                                _this.animationClips = gltf.animations;
+                                                if (_this.animationClips && _this.animationClips.length) {
+                                                    _this.animationClips.forEach(function(clip, index) {
+                                                        var action = _this.animationMixer.clipAction(clip);
+                                                        var actionName = clip.name || "Animation ".concat(index + 1);
+                                                        _this.animationActions[actionName] = action;
+                                                        // Create a button for this animation
+                                                        var button = document.createElement('button');
+                                                        button.innerText = actionName;
+                                                        button.style.padding = '5px 10px';
+                                                        button.style.fontSize = '13px';
+                                                        button.style.backgroundColor = '#f0f0f0';
+                                                        button.style.color = 'black';
+                                                        button.style.border = '2px solid black';
+                                                        button.style.borderRadius = '4px';
+                                                        button.style.cursor = 'pointer';
+                                                        button.style.transition = 'background-color 0.2s ease, box-shadow 0.2s ease';
+                                                        button.style.boxShadow = '2px 2px 0px black';
+                                                        button.addEventListener('click', function() {
+                                                            return _this._playAnimation(actionName);
+                                                        });
+                                                        _this.animationButtonsContainer.appendChild(button);
+                                                        console.log("Loaded animation and created button for: ".concat(actionName));
                                                     });
-                                                    _this.animationButtonsContainer.appendChild(button);
-                                                    console.log("Loaded animation and created button for: ".concat(actionName));
-                                                });
-                                                // Play the first animation by default
-                                                // Try to find and play an "idle" animation by default
-                                                var defaultActionName = Object.keys(_this.animationActions)[0]; // Fallback to the first animation
-                                                var idleActionKey = Object.keys(_this.animationActions).find(function(name) {
-                                                    return name.toLowerCase().includes('idle');
-                                                });
-                                                if (idleActionKey) {
-                                                    defaultActionName = idleActionKey;
-                                                    console.log("Found idle animation: ".concat(defaultActionName));
-                                                } else if (defaultActionName) {
-                                                    console.log("No specific idle animation found, defaulting to first animation: ".concat(defaultActionName));
-                                                }
-                                                if (defaultActionName && _this.animationActions[defaultActionName]) {
-                                                    _this.currentAction = _this.animationActions[defaultActionName];
-                                                    _this.currentAction.play();
-                                                    console.log("Playing default animation: ".concat(defaultActionName));
-                                                    _this._updateButtonStyles(defaultActionName);
+                                                    var defaultActionName = Object.keys(_this.animationActions)[0];
+                                                    var idleActionKey = Object.keys(_this.animationActions).find(function(name) {
+                                                        return name.toLowerCase().includes('idle');
+                                                    });
+                                                    if (idleActionKey) {
+                                                        defaultActionName = idleActionKey;
+                                                        console.log("Found idle animation: ".concat(defaultActionName));
+                                                    } else if (defaultActionName) {
+                                                        console.log("No specific idle animation found, defaulting to first animation: ".concat(defaultActionName));
+                                                    }
+                                                    if (defaultActionName && _this.animationActions[defaultActionName]) {
+                                                        _this.currentAction = _this.animationActions[defaultActionName];
+                                                        _this.currentAction.play();
+                                                        console.log("Playing default animation: ".concat(defaultActionName));
+                                                        _this._updateButtonStyles(defaultActionName);
+                                                    } else {
+                                                        console.log("No animations found or default animation could not be played.");
+                                                    }
                                                 } else {
-                                                    console.log("No animations found or default animation could not be played.");
+                                                    console.log("Stan model has no embedded animations.");
                                                 }
-                                            } else {
-                                                console.log("Stan model has no embedded animations.");
-                                            }
-                                            // Scale and position the model
-                                            // These values might need adjustment based on the model's original size and pivot
-                                            var scale = 80; // This scale might need adjustment for Stan model
-                                            _this.pandaModel.scale.set(scale, scale, scale);
-                                            // Position the model: X=center, Y=roughly bottom, Z=in front of hands
-                                            var sceneHeight = _this.renderDiv.clientHeight;
-                                            _this.pandaModel.position.set(0, sceneHeight * -0.45, -1000); // Updated Z to -1000
-                                            _this.scene.add(_this.pandaModel);
-                                            console.log("Stan GLTF model loaded and added to scene.");
-                                            resolve();
-                                        }, undefined, function(error) {
-                                            console.error('An error occurred while loading the Stan GLTF model:', error); // Updated log
-                                            reject(error);
-                                        });
-                                    })
+                                                // Scale and position Stan (left side)
+                                                var scale = 80;
+                                                _this.pandaModel.scale.set(scale, scale, scale);
+                                                var sceneHeight = _this.renderDiv.clientHeight;
+                                                _this.pandaModel.position.set(-300, sceneHeight * -0.45, -1000);
+                                                _this.pandaModel.userData.modelName = 'Stan';
+                                                _this.scene.add(_this.pandaModel);
+                                                _this.loadedModels.push(_this.pandaModel);
+                                                console.log("Stan GLTF model loaded and added to scene.");
+                                                resolve();
+                                            }, undefined, function(error) {
+                                                console.error('An error occurred while loading the Stan GLTF model:', error);
+                                                reject(error);
+                                            });
+                                        }),
+                                        // Load Bed model
+                                        new Promise(function(resolve, reject) {
+                                            gltfLoader.load('assets/scene.gltf', function(gltf) {
+                                                _this.bedModel = gltf.scene;
+                                                // Scale and position Bed (right side)
+                                                var bedScale = 150;
+                                                _this.bedModel.scale.set(bedScale, bedScale, bedScale);
+                                                var sceneHeight = _this.renderDiv.clientHeight;
+                                                _this.bedModel.position.set(300, sceneHeight * -0.45, -1000);
+                                                _this.bedModel.userData.modelName = 'Bed';
+                                                _this.scene.add(_this.bedModel);
+                                                _this.loadedModels.push(_this.bedModel);
+                                                console.log("Bed GLTF model loaded and added to scene.");
+                                                resolve();
+                                            }, undefined, function(error) {
+                                                console.error('An error occurred while loading the Bed GLTF model:', error);
+                                                reject(error);
+                                            });
+                                        })
+                                    ])
                                 ];
                             case 2:
                                 _state.sent();
                                 console.log("All specified assets loaded.");
+                                // Set the active model to the first one (Stan by default)
+                                if (_this.loadedModels.length > 0) {
+                                    _this.pandaModel = _this.loadedModels[_this.activeModelIndex];
+                                    console.log("Active model set to: ".concat(_this.pandaModel.userData.modelName || 'Unknown'));
+
+                                    // Create highlight rings for each loaded model
+                                    for (var i = 0; i < _this.loadedModels.length; i++) {
+                                        var highlight = _this._createModelHighlight(_this.loadedModels[i]);
+                                        _this.modelHighlights.push(highlight);
+                                    }
+                                    console.log("Created ".concat(_this.modelHighlights.length, " model highlight indicators"));
+                                }
                                 return [
                                     3,
                                     4
@@ -721,6 +773,131 @@ export var Game = /*#__PURE__*/ function() {
                         }
                     });
                 })();
+            }
+        },
+        {
+            key: "_getActiveModel",
+            value: function _getActiveModel() {
+                // Return the currently active model, or fallback to pandaModel for compatibility
+                return this.loadedModels[this.activeModelIndex] || this.pandaModel;
+            }
+        },
+        {
+            key: "_getClosestModelToHand",
+            value: function _getClosestModelToHand(handScreenPos) {
+                if (this.loadedModels.length === 0) return null;
+                if (!handScreenPos) return this.loadedModels[this.activeModelIndex];
+
+                var closestModel = null;
+                var minDistance = Infinity;
+
+                // Iterar sobre todos los modelos cargados
+                for (var i = 0; i < this.loadedModels.length; i++) {
+                    var model = this.loadedModels[i];
+
+                    // Proyectar posición 3D del modelo a coordenadas de pantalla
+                    var modelPos3D = new THREE.Vector3();
+                    model.getWorldPosition(modelPos3D);
+
+                    // Convertir a coordenadas de pantalla (NDC)
+                    var modelPosScreen = modelPos3D.clone();
+                    modelPosScreen.project(this.camera);
+
+                    // Convertir de NDC (-1 a 1) a coordenadas de pantalla (origen en centro)
+                    var modelScreenX = modelPosScreen.x * (this.renderDiv.clientWidth / 2);
+                    var modelScreenY = modelPosScreen.y * (this.renderDiv.clientHeight / 2);
+
+                    // Calcular distancia 2D en pantalla
+                    var dx = handScreenPos.x - modelScreenX;
+                    var dy = handScreenPos.y - modelScreenY;
+                    var distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestModel = model;
+                    }
+                }
+
+                return closestModel;
+            }
+        },
+        {
+            key: "_createModelHighlight",
+            value: function _createModelHighlight(model) {
+                // Crear un círculo/halo debajo del modelo para indicar cuál está activo
+                var geometry = new THREE.RingGeometry(80, 100, 32);
+                var material = new THREE.MeshBasicMaterial({
+                    color: 0x00ff00,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0.0 // Invisible por defecto
+                });
+                var ring = new THREE.Mesh(geometry, material);
+
+                // Posicionar el anillo debajo del modelo
+                ring.position.copy(model.position);
+                ring.position.y -= 200; // Debajo del modelo
+                ring.rotation.x = Math.PI / 2; // Horizontal
+
+                this.scene.add(ring);
+                return ring;
+            }
+        },
+        {
+            key: "_updateModelHighlights",
+            value: function _updateModelHighlights() {
+                // Actualizar la opacidad de los halos según el modelo activo
+                for (var i = 0; i < this.modelHighlights.length; i++) {
+                    if (this.modelHighlights[i]) {
+                        var targetOpacity = (i === this.activeModelIndex) ? 0.6 : 0.0;
+                        // Suavizar la transición
+                        this.modelHighlights[i].material.opacity += (targetOpacity - this.modelHighlights[i].material.opacity) * 0.1;
+
+                        // Animación de pulso para el modelo activo
+                        if (i === this.activeModelIndex) {
+                            var time = Date.now() * 0.003;
+                            var scale = 1.0 + Math.sin(time) * 0.1;
+                            this.modelHighlights[i].scale.set(scale, scale, 1);
+                        } else {
+                            this.modelHighlights[i].scale.set(1, 1, 1);
+                        }
+                    }
+                }
+            }
+        },
+        {
+            key: "_updateActiveModelByProximity",
+            value: function _updateActiveModelByProximity() {
+                // Encontrar la mano activa (la primera que esté visible)
+                var activeHand = null;
+                var handScreenPos = null;
+
+                for (var i = 0; i < this.hands.length; i++) {
+                    if (this.hands[i].landmarks && this.hands[i].landmarks.length > 0) {
+                        activeHand = this.hands[i];
+                        handScreenPos = new THREE.Vector2(
+                            this.hands[i].pinchPointScreen.x,
+                            this.hands[i].pinchPointScreen.y
+                        );
+                        break; // Usar la primera mano visible
+                    }
+                }
+
+                if (!handScreenPos) return; // No hay manos visibles
+
+                // Encontrar el modelo más cercano
+                var closestModel = this._getClosestModelToHand(handScreenPos);
+
+                if (closestModel) {
+                    // Actualizar el índice activo
+                    var newIndex = this.loadedModels.indexOf(closestModel);
+                    if (newIndex !== -1 && newIndex !== this.activeModelIndex) {
+                        this.activeModelIndex = newIndex;
+                        this.pandaModel = closestModel;
+                        console.log("%c🎯 Active Model: ".concat(closestModel.userData.modelName || 'Unknown'),
+                                    "background: #4CAF50; color: white; padding: 5px 10px; border-radius: 3px; font-weight: bold;");
+                    }
+                }
             }
         },
         {
@@ -788,6 +965,7 @@ export var Game = /*#__PURE__*/ function() {
                                             // Adjust video size slightly after metadata is loaded if needed, but CSS handles most
                                             _this.videoElement.style.width = _this.renderDiv.clientWidth + 'px';
                                             _this.videoElement.style.height = _this.renderDiv.clientHeight + 'px';
+                                            // Video size is fixed at 280x210px (Loom-style) - no need to adjust
                                             resolve();
                                         };
                                     })
@@ -1452,10 +1630,18 @@ export var Game = /*#__PURE__*/ function() {
                 // Update hands if tracking
                 if (this.gameState === 'tracking') {
                     this._updateHands();
+                    // Auto-switch model based on hand proximity
+                    if (this.loadedModels.length > 1) {
+                        this._updateActiveModelByProximity();
+                    }
                 }
                 // Update animation mixer
                 if (this.animationMixer) {
                     this.animationMixer.update(deltaTime);
+                }
+                // Update model highlight indicators
+                if (this.modelHighlights.length > 0) {
+                    this._updateModelHighlights();
                 }
                 // Bounding box helper visibility logic REMOVED
                 // _updateGhosts and _updateParticles calls removed.
