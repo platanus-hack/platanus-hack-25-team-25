@@ -41,9 +41,6 @@ function createCharacterPreview(character, containerId) {
         var size = box.getSize(new THREE.Vector3());
         var center = box.getCenter(new THREE.Vector3());
 
-        console.log('Model ' + character + ' size:', size);
-        console.log('Model ' + character + ' center:', center);
-
         // Different scales and camera positions for different characters
         if (character === 'bumblebee') {
             // Bumblebee is a Transformer - should be bigger (like 2x taller than Red)
@@ -60,7 +57,6 @@ function createCharacterPreview(character, containerId) {
         }
 
         scene.add(model);
-        console.log('Preview loaded for:', character, 'with scale:', scale);
 
         // Animation loop
         function animate() {
@@ -69,10 +65,6 @@ function createCharacterPreview(character, containerId) {
             renderer.render(scene, camera);
         }
         animate();
-    }, function(progress) {
-        console.log('Loading preview for ' + character + ':', (progress.loaded / progress.total * 100).toFixed(2) + '%');
-    }, function(error) {
-        console.error('Error loading preview for ' + character + ':', error);
     });
 }
 
@@ -98,7 +90,6 @@ selectButtons.forEach(function(button) {
             if (!renderDiv) {
                 console.error('Fatal Error: renderDiv element not found.');
             } else {
-                console.log('Initializing game with character:', selectedCharacter);
                 game = new Game(renderDiv, selectedCharacter);
                 game.start();
             }

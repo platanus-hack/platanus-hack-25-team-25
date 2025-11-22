@@ -655,7 +655,6 @@ export var Game = /*#__PURE__*/ function() {
                                 ]);
                                 // Load the selected character model
                                 var modelPath = "assets/".concat(_this.selectedCharacter, ".gltf");
-                                console.log("Loading selected character: ".concat(_this.selectedCharacter, " from ").concat(modelPath));
                                 return [
                                     4,
                                     new Promise(function(resolve, reject) {
@@ -722,7 +721,7 @@ export var Game = /*#__PURE__*/ function() {
                                             _this.pandaModel.userData.modelName = _this.selectedCharacter;
                                             _this.scene.add(_this.pandaModel);
                                             _this.loadedModels.push(_this.pandaModel);
-                                            console.log(_this.selectedCharacter, " GLTF model loaded and added to scene with scale:", scale);
+                                            console.log(_this.selectedCharacter, " GLTF model loaded and added to scene.");
                                             resolve();
                                         }, undefined, function(error) {
                                             console.error('An error occurred while loading the ', _this.selectedCharacter, ' GLTF model:', error);
