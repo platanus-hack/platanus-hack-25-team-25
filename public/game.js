@@ -342,26 +342,16 @@ export var Game = /*#__PURE__*/ function() {
                                         _this._startProgressBar();
                                     }
                                 }, videoStartDelay);
-                                // Shrink right side after video duration (video starts 2s after load)
+                                // Hide right side after video duration (video starts 2s after load)
                                 var totalDelay = videoStartDelay + (ONBOARDING_VIDEO_DURATION_SECONDS * 1000);
                                 setTimeout(function() {
                                     if (_this.onboardingContainer && _this.gameContainer) {
-                                        _this.onboardingContainer.style.width = '0%';
+                                        _this.onboardingContainer.style.display = 'none';
                                         _this.gameContainer.style.width = '100%';
-                                        // Continuously resize during the 1s transition using requestAnimationFrame
-                                        var startTime = Date.now();
-                                        var transitionDuration = 1000; // 1 second transition
-                                        var resizeLoop = function() {
-                                            var elapsed = Date.now() - startTime;
-                                            if (elapsed < transitionDuration + 100) {
-                                                _this._onResize();
-                                                requestAnimationFrame(resizeLoop);
-                                            } else {
-                                                // Final resize after transition completes
-                                                _this._onResize();
-                                            }
-                                        };
-                                        requestAnimationFrame(resizeLoop);
+                                        // Resize immediately after the change
+                                        requestAnimationFrame(function() {
+                                            _this._onResize();
+                                        });
                                     }
                                 }, totalDelay);
                                 return [
@@ -389,7 +379,6 @@ export var Game = /*#__PURE__*/ function() {
                 this.gameContainer.style.width = '50%';
                 this.gameContainer.style.height = '100%';
                 this.gameContainer.style.overflow = 'hidden';
-                this.gameContainer.style.transition = 'width 1s ease-in-out';
                 this.renderDiv.appendChild(this.gameContainer);
                 
                 // Onboarding container (right half)
@@ -398,7 +387,6 @@ export var Game = /*#__PURE__*/ function() {
                 this.onboardingContainer.style.width = '50%';
                 this.onboardingContainer.style.height = '100%';
                 this.onboardingContainer.style.overflow = 'hidden';
-                this.onboardingContainer.style.transition = 'width 1s ease-in-out';
                 this.onboardingContainer.style.backgroundColor = '#000';
                 this.renderDiv.appendChild(this.onboardingContainer);
                 
@@ -1689,6 +1677,10 @@ export var Game = /*#__PURE__*/ function() {
                         if (finalTranscript) {
                             _this.speechBubble.innerHTML = finalTranscript;
                             _this.speechBubble.style.opacity = '1';
+                            var transcriptLower = finalTranscript.toLowerCase();
+                            if (transcriptLower.includes('dragon')) {
+                                _this._createDragon();
+                            }
                             // Send transcript to backend and play audio response
                             _this._sendToBackendAndPlay(finalTranscript);
                             _this.speechBubbleTimeout = setTimeout(function() {
@@ -1723,6 +1715,8 @@ export var Game = /*#__PURE__*/ function() {
                     ];
                     if (validCommands.includes(command.toLowerCase())) {
                         _this._setInteractionMode(command.toLowerCase());
+                    } else if (command.toLowerCase() === 'dragon') {
+                        _this._createDragon();
                     } else {
                         console.warn("Unrecognized command via speech: ".concat(command));
                     }

@@ -185,7 +185,8 @@ export var SpeechManager = /*#__PURE__*/ function() {
                             'zoom': 'scale',
                             'animate': 'animate',
                             'anime': 'animate',
-                            'animation': 'animate' // Alias for animate
+                            'animation': 'animate',
+                            'dragon': 'dragon'
                         };
                         var spokenCommands = Object.keys(commandMap);
                         var _iteratorNormalCompletion = true, _didIteratorError = false, _iteratorError = undefined;
