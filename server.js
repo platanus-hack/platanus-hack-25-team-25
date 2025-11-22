@@ -16,8 +16,39 @@ app.use(express.json());
 app.use(express.static("public"));
 app.use(cors());
 
-let chatHistory = [];
+const chatHistories = new Map();
 const MAX_TURNS = 20;
+const SESSION_TIMEOUT = 30 * 60 * 1000;
+
+function getOrCreateChatHistory(conversationId) {
+  if (!conversationId) {
+    conversationId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+  
+  if (!chatHistories.has(conversationId)) {
+    console.log(`Creating new chat history for session: ${conversationId}`);
+    chatHistories.set(conversationId, {
+      history: [],
+      lastAccess: Date.now()
+    });
+  } else {
+    chatHistories.get(conversationId).lastAccess = Date.now();
+  }
+  
+  return chatHistories.get(conversationId).history;
+}
+
+function cleanupOldSessions() {
+  const now = Date.now();
+  for (const [id, session] of chatHistories.entries()) {
+    if (now - session.lastAccess > SESSION_TIMEOUT) {
+      console.log(`Cleaning up expired session: ${id}`);
+      chatHistories.delete(id);
+    }
+  }
+}
+
+setInterval(cleanupOldSessions, 5 * 60 * 1000);
 
 const SYSTEM_PROMPT = `CRITICAL INSTRUCTION - JSON FORMAT REQUIRED:
 You MUST respond ONLY with valid JSON. Never respond with plain text.
@@ -28,14 +59,23 @@ If no command is needed, omit the command field:
 {"text": "your response in spanish"}
 
 EXAMPLES:
-User: "dragón" or "quiero un dragón" or "pon un dragón"
+User: "dragón" or "quiero un dragón"
 Response: {"text": "¡Genial! Te traigo un dragón. ¿Quieres aprender a moverlo?", "command": "dragon"}
 
-User: "hola" or "¿cómo estás?"
+User: "mono" or "quiero un mono"
+Response: {"text": "¡Un mono! Aquí está. ¿Qué va a hacer?", "command": "monkey"}
+
+User: "plátano" or "pon un plátano"
+Response: {"text": "¡Un plátano delicioso! ¿Para quién es?", "command": "platano"}
+
+User: "astronauta"
+Response: {"text": "¡Un astronauta espacial! ¿Listo para explorar?", "command": "astronaut"}
+
+User: "hola"
 Response: {"text": "¡Hola! ¿Qué quieres crear hoy?"}
 
 User: "¿qué puedo hacer?"
-Response: {"text": "¡Puedes decir arrastrar, rotar, escalar o animar! ¿Qué quieres probar?"}
+Response: {"text": "¡Puedes agregar un dragón, mono, plátano o astronauta! ¿Cuál quieres?"}
 
 ---
 
@@ -48,7 +88,10 @@ PLATFORM FEATURES:
 - ANIMACIÓN: Di "animación" para ver animaciones
 
 AVAILABLE OBJECTS:
-- DRAGÓN: When user mentions "dragón" or "dragon" or asks to add it, you MUST include "command": "dragon" in your JSON response
+- DRAGÓN: When user mentions "dragón" or "dragon", include "command": "dragon"
+- MONO: When user mentions "mono" or "monkey", include "command": "monkey"  
+- PLÁTANO: When user mentions "plátano" or "platano" or "banana", include "command": "platano"
+- ASTRONAUTA: When user mentions "astronauta" or "astronaut", include "command": "astronaut"
 
 GUIDELINES:
 - Keep responses SHORT (max 1-2 sentences, under 100 words)
@@ -65,8 +108,9 @@ REMEMBER: EVERY response must be valid JSON with "text" field in Spanish, and op
 // /speak: text -> Gemini -> TTS -> return audio
 app.post("/speak", async (req, res) => {
   try {
-    const { text, sceneContext } = req.body || {};
+    const { text, sceneContext, conversationId } = req.body || {};
     console.log('=== /speak endpoint called ===');
+    console.log('Conversation ID:', conversationId);
     console.log('User text:', text);
     console.log('Scene context:', JSON.stringify(sceneContext, null, 2));
     
@@ -102,7 +146,10 @@ app.post("/speak", async (req, res) => {
     
     console.log('Message to Gemini:', userMessage);
 
-    // 1) Call Gemini API
+    // 1) Get or create chat history for this session
+    const chatHistory = getOrCreateChatHistory(conversationId);
+    
+    // Add user message to history
     chatHistory.push({
       role: "user",
       parts: [{ text: userMessage }]
@@ -135,22 +182,35 @@ app.post("/speak", async (req, res) => {
     }
 
     const geminiData = await geminiResp.json();
-    let rawReply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || '{"text": "¡Estoy aquí para ayudar! ¿Qué te gustaría explorar?"}';
+    console.log('Full Gemini response structure:', JSON.stringify(geminiData, null, 2));
+    
+    if (!geminiData?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      console.error('ERROR: No valid text in Gemini response!');
+      console.error('Gemini data:', JSON.stringify(geminiData, null, 2));
+      throw new Error('Gemini did not return a valid response');
+    }
+    
+    let rawReply = geminiData.candidates[0].content.parts[0].text;
+    console.log('=== Raw Gemini response text ===');
+    console.log(rawReply);
+    console.log('=== End raw response ===');
 
-    console.log('Raw Gemini response:', rawReply);
-
-    let replyText = "¡Estoy aquí para ayudar!";
+    let replyText = null;
     let command = null;
 
     try {
       let jsonToParse = rawReply.trim();
+      
       if (!jsonToParse.startsWith('{')) {
         const jsonMatch = rawReply.match(/\{[\s\S]*\}/);
-        console.log('JSON match found:', jsonMatch ? jsonMatch[0] : 'none');
+        console.log('Searching for JSON in response...');
         if (jsonMatch) {
           jsonToParse = jsonMatch[0];
+          console.log('Found JSON:', jsonToParse);
         } else {
-          throw new Error('No JSON found in response');
+          console.warn('No JSON structure found in response, using raw text');
+          replyText = rawReply;
+          throw new Error('No JSON found');
         }
       }
       
@@ -163,22 +223,41 @@ app.post("/speak", async (req, res) => {
         console.log('Extracted text:', replyText);
         console.log('Extracted command:', command);
       } else {
-        console.warn('JSON parsed but no "text" field found');
+        console.warn('JSON parsed but no "text" field found, using entire response');
         replyText = rawReply;
       }
     } catch (e) {
-      console.log("Failed to parse JSON, treating as plain text:", e.message);
-      replyText = rawReply;
+      console.log("JSON parsing failed:", e.message);
+      if (!replyText) {
+        replyText = rawReply;
+      }
+    }
+    
+    if (!replyText || replyText.trim().length === 0) {
+      console.error('Empty reply text, using fallback');
+      replyText = '¡Estoy aquí para ayudar! ¿Qué te gustaría explorar?';
     }
 
     if (!command) {
       const userTextLower = text.toLowerCase();
       const contextStr = JSON.stringify(sceneContext).toLowerCase();
-      const hasDragonInScene = contextStr.includes('dragón') || contextStr.includes('dragon');
       
-      if ((userTextLower.includes('dragón') || userTextLower.includes('dragon')) && !hasDragonInScene) {
-        console.log('FALLBACK: User mentioned dragon, adding command automatically');
-        command = 'dragon';
+      const objectChecks = [
+        { keywords: ['dragón', 'dragon'], contextNames: ['dragón', 'dragon'], command: 'dragon' },
+        { keywords: ['mono', 'monkey'], contextNames: ['mono', 'monkey'], command: 'monkey' },
+        { keywords: ['plátano', 'platano', 'banana'], contextNames: ['plátano', 'platano'], command: 'platano' },
+        { keywords: ['astronauta', 'astronaut'], contextNames: ['astronauta', 'astronaut'], command: 'astronaut' }
+      ];
+      
+      for (const check of objectChecks) {
+        const userMentioned = check.keywords.some(kw => userTextLower.includes(kw));
+        const inScene = check.contextNames.some(name => contextStr.includes(name));
+        
+        if (userMentioned && !inScene) {
+          console.log(`FALLBACK: User mentioned ${check.command}, adding command automatically`);
+          command = check.command;
+          break;
+        }
       }
     }
 
@@ -188,12 +267,24 @@ app.post("/speak", async (req, res) => {
       parts: [{ text: replyText }]
     });
 
-    // Keep history within MAX_TURNS
+    // Keep history within MAX_TURNS (trim if too long)
     if (chatHistory.length > MAX_TURNS * 2) {
-      chatHistory = chatHistory.slice(-MAX_TURNS * 2);
+      const trimmed = chatHistory.slice(-MAX_TURNS * 2);
+      chatHistory.length = 0;
+      chatHistory.push(...trimmed);
     }
 
     // 3) ElevenLabs TTS with Gemini response (only the text part)
+    const textForTTS = replyText.trim();
+    
+    if (textForTTS.startsWith('{') || textForTTS.includes('"text":')) {
+      console.error('WARNING: Attempting to send JSON to TTS instead of text!');
+      console.error('Text being sent:', textForTTS);
+      throw new Error('Invalid text for TTS - contains JSON structure');
+    }
+    
+    console.log('Sending to TTS:', textForTTS);
+    
     const ttsUrl = `https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_VOICE_ID}`;
     const ttsResp = await fetch(ttsUrl, {
       method: "POST",
@@ -203,7 +294,7 @@ app.post("/speak", async (req, res) => {
         Accept: "audio/mpeg" 
       },
       body: JSON.stringify({
-        text: replyText.trim(),
+        text: textForTTS,
         model_id: "eleven_multilingual_v2",
         voice_settings: { stability: 0.4, similarity_boost: 0.8, speed: 1.15 }
       })
@@ -237,6 +328,31 @@ app.post("/speak", async (req, res) => {
     return res.json(response);
   } catch (e) {
     console.error("Speak error:", e);
+    return res.status(500).json({ error: e.message || "Internal error" });
+  }
+});
+
+// Endpoint to clear chat history for a specific session or all sessions
+app.post("/clear-history", (req, res) => {
+  try {
+    const { conversationId } = req.body || {};
+    
+    if (conversationId) {
+      if (chatHistories.has(conversationId)) {
+        chatHistories.delete(conversationId);
+        console.log(`Cleared history for session: ${conversationId}`);
+        return res.json({ message: "Session history cleared", conversationId });
+      } else {
+        return res.json({ message: "Session not found", conversationId });
+      }
+    } else {
+      const count = chatHistories.size;
+      chatHistories.clear();
+      console.log(`Cleared all ${count} chat sessions`);
+      return res.json({ message: "All histories cleared", count });
+    }
+  } catch (e) {
+    console.error("Clear history error:", e);
     return res.status(500).json({ error: e.message || "Internal error" });
   }
 });
