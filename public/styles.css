@@ -1,0 +1,141 @@
+body, html {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #000;
+}
+#webcam, #canvas, #three-canvas {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  object-fit: cover;
+  pointer-events: none;
+  transform: scaleX(-1);
+}
+#recycle-bin {
+  position: absolute;
+  bottom: 60px;
+  right: 60px;
+  width: 160px;
+  height: 160px;
+  z-index: 20;
+  pointer-events: none;
+}
+#recycle-bin.active {
+  filter: drop-shadow(0 0 10px #ff0000);
+  transform: scale(1.1);
+  transition: transform 0.2s, filter 0.2s;
+}
+#instructions {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  text-align: left;
+  /* color: white; */
+  /* background: rgba(0, 0, 0, 0.5); */
+  /* padding: 10px 15px; */
+  /* border-radius: 10px; */
+  /* font-family: sans-serif; */
+  /* font-size: 14px; */
+  /* z-index: 30; */
+}
+
+#links-para{
+        position: absolute;
+        bottom: 5px;
+        left: 5px;
+        font-family: Helvetica, sans-serif;
+        font-size: 16px;
+        background-color: rgba(255, 255, 255, 0.5);
+        padding: 10px;
+}
+
+a {
+    color: #0000FF !important;
+}
+
+#coffee-link {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  font-family: Helvetica, sans-serif;
+  font-size: 16px;
+  background-color: rgba(255, 255, 255, 0.5);
+  padding: 10px;
+}
+
+.text-box {
+    padding: 8px 15px;
+    background-color: rgba(255, 255, 255, 0.9);
+    color: black;
+    border-radius: 4px;
+    font-family: "Arial", "Helvetica Neue", Helvetica, sans-serif;
+    border: 2px solid black;
+    box-shadow: 3px 3px 0px black;
+    font-size: clamp(13px, 2vw, 15px);
+    text-align: center;
+    z-index: 200;
+    opacity: 1;
+    transition: opacity 0.3s ease-in-out, bottom 0.3s ease-in-out, box-shadow 0.2s ease;
+}
+
+
+#social-links {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+}
+
+#logo-container {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+#video-link {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+}
+
+#logo {
+    font-size: 2em;
+}
+
+#vibe-ui {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-radius: 12px;
+  font-family: system-ui, sans-serif;
+  max-width: 280px;
+  z-index: 9999; /* make sure it's above the canvas */
+}
+
+#talk-btn {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+#transcript,
+#assistant-answer {
+  font-size: 12px;
+  margin-top: 4px;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+#assistant-label {
+  font-weight: bold;
+  margin-top: 6px;
+  display: block;
+}

@@ -1,0 +1,26 @@
+{
+  "name": "platanus-hack-25-team-25",
+  "version": "1.0.0",
+  "description": "**Current project logo:** project-logo.png",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/platanus-hack/platanus-hack-25-team-25.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/platanus-hack/platanus-hack-25-team-25/issues"
+  },
+  "homepage": "https://github.com/platanus-hack/platanus-hack-25-team-25#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0"
+  }
+}

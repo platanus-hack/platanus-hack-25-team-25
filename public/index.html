@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vibe Imagine</title>
+  <script defer src="https://cloud.umami.is/script.js" data-website-id="eb59c81c-27cb-4e1d-9e8c-bfbe70c48cd9"></script>
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Primary Meta Tags -->
+  <meta name="title" content="Vibe Imagine">
+  <meta name="description" content="Vibe Imagine is a platform for kids to create virtual worlds.">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://collidingscopes.github.io/shape-creator-tutorial/">
+  <meta property="og:title" content="Vibe Imagine">
+  <meta property="og:description" content="Vibe Imagine is a platform for kids to create virtual worlds.">
+  <meta property="og:image" content="https://raw.githubusercontent.com/collidingScopes/shape-creator-tutorial/main/demo.png">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://collidingscopes.github.io/shape-creator-tutorial/">
+  <meta property="twitter:title" content="Vibe Imagine">
+  <meta property="twitter:description" content="Vibe Imagine is a platform for kids to create virtual worlds.">
+  <meta property="twitter:image" content="https://raw.githubusercontent.com/collidingScopes/shape-creator-tutorial/main/demo.png">
+  
+</head>
+<body>
+
+  <video id="webcam" autoplay muted playsinline></video>
+  <canvas id="canvas"></canvas>
+  <div id="three-canvas"></div>
+  <img id="recycle-bin" src="recyclebin.png" alt="Recycle Bin" />
+  <div id="instructions" class="text-box">
+    Bring hands close and pinch to create a shape<br>
+     > Move hands apart to make the shape larger<br>
+    Hover over a shape / pinch to move it<br>
+    Move a shape into the recycle bin to delete it
+  </div>
+
+  <div id="social-links" class="text-box">
+      <a href="https://www.x.com/measure_plan/" target="_blank">Twitter</a><br>
+      <a href="https://www.instagram.com/stereo.drift/" target="_blank">Instagram</a><br>
+      <a href="https://www.youtube.com/@funwithcomputervision" target="_blank">Youtube</a>
+  </div>
+  <div id="logo-container" class="text-box">
+      <span id="logo">🪬</span><br>
+      <a href="https://www.funwithcomputervision.com/" target="_blank">code & tutorials here</a>
+  </div>
+
+  <div id="vibe-ui">
+    <button id="talk-btn">🎙 Talk to Vibe</button>
+    <div id="transcript"></div>
+    <span id="assistant-label">Vibe Imagine:</span>
+    <div id="assistant-answer"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+</body>
+
+<script src="main.js"></script>
+
+</html>
