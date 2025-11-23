@@ -710,7 +710,7 @@ app.post("/clear-history", (req, res) => {
   }
 });
 
-app.get("*", (req, res) => {
+app.get("/*", (req, res) => {
   res.sendFile(join(__dirname, "public", "index.html"));
 });
 
