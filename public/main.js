@@ -11,21 +11,10 @@ var selectedCharacter = null;
 var selectedBackground = null;
 var game = null;
 
-// Check localStorage for existing user
+// Always show name input (onboarding always shown)
 function checkExistingUser() {
-    var savedName = localStorage.getItem('playerName');
-
-    if (savedName) {
-        // User exists, skip name input and go to character selection
-        characterSelection.style.display = 'flex';
-        // Initialize previews after showing the screen
-        setTimeout(function() {
-            initializeCharacterPreviews();
-        }, 50);
-    } else {
-        // New user, show name input
-        nameInput.style.display = 'flex';
-    }
+    // Always show name input, no localStorage check
+    nameInput.style.display = 'flex';
 }
 
 // Handle name submission
@@ -36,7 +25,7 @@ if (nameSubmitBtn) {
         var playerName = playerNameInput.value.trim();
 
         if (playerName) {
-            // Save name to localStorage
+            // Save name to localStorage (optional, but keeping it)
             localStorage.setItem('playerName', playerName);
 
             // Hide name input
@@ -177,8 +166,8 @@ backgroundSelectButtons.forEach(function(button) {
             } else {
                 console.log('Initializing Game with character:', selectedCharacter, 'and background:', selectedBackground);
 
-                // Check if user already has a name (skip onboarding if they do)
-                var skipOnboarding = localStorage.getItem('playerName') !== null;
+                // Always show onboarding (never skip it)
+                var skipOnboarding = false;
 
                 game = new Game(renderDiv, selectedCharacter, selectedBackground, function() {
                     // Callback when game is fully loaded
