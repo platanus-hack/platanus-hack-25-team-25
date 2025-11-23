@@ -236,8 +236,14 @@ export var Game = /*#__PURE__*/ function() {
         this.isSpeechActive = false; // Track if speech recognition is active for styling
         this.isPlayingAudio = false; // Track if audio is currently playing (for bubble animation)
         this.backendUrl = 'http://localhost:3000'; // Backend URL
+        // Clear any previous session on page load/refresh
+        this._clearPreviousSession();
         this.conversationId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         console.log('New conversation session created:', this.conversationId);
+        // Clear session when page is about to unload (refresh/close)
+        window.addEventListener('beforeunload', function() {
+            _this._clearPreviousSession();
+        });
         this.grabbingHandIndex = -1; // -1: no hand, 0: first hand, 1: second hand grabbing
         this.pickedUpModel = null; // Reference to the model being dragged
         this.modelDragOffset = new THREE.Vector3(); // Offset between model and pinch point in 3D
@@ -2095,6 +2101,26 @@ export var Game = /*#__PURE__*/ function() {
                 setTimeout(function() {
                     document.body.removeChild(flash);
                 }, 900);
+            }
+        },
+        {
+            key: "_clearPreviousSession",
+            value: function _clearPreviousSession() {
+                var _this = this;
+                // Clear all sessions on page load/refresh
+                fetch("".concat(this.backendUrl, "/clear-history"), {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({})
+                }).then(function(response) {
+                    return response.json();
+                }).then(function(data) {
+                    console.log('All previous sessions cleared on page load:', data);
+                }).catch(function(error) {
+                    console.error("Error clearing previous sessions:", error);
+                });
             }
         },
         {
