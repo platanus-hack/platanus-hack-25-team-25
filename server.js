@@ -59,9 +59,6 @@ console.log('   (Note: This model uses thinking tokens, so maxOutputTokens is se
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-__filename = fileURLToPath(import.meta.url);
-__dirname = dirname(__filename);
-
 app.use(express.static(join(__dirname, "public")));
 
 app.use(cors());
