@@ -3,8 +3,17 @@ import cors from "cors";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
 import { SpeechClient } from "@google-cloud/speech";
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 dotenv.config();
+
+if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = join(__dirname, 'service-account.json');
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
