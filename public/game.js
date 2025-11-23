@@ -243,10 +243,14 @@ export var Game = /*#__PURE__*/ function() {
         window.addEventListener('beforeunload', function() {
             _this._clearPreviousSession();
         });
-        this.grabbingHandIndex = -1; // -1: no hand, 0: first hand, 1: second hand grabbing
-        this.pickedUpModel = null; // Reference to the model being dragged
-        this.modelDragOffset = new THREE.Vector3(); // Offset between model and pinch point in 3D
-        this.modelGrabStartDepth = 0; // To store the model's Z depth when grabbed
+        this.grabbingHandIndex = -1; // -1: no hand, 0: first hand, 1: second hand grabbing (kept for backward compatibility)
+        this.pickedUpModel = null; // Reference to the model being dragged (kept for backward compatibility)
+        this.modelDragOffset = new THREE.Vector3(); // Offset between model and pinch point in 3D (kept for backward compatibility)
+        this.modelGrabStartDepth = 0; // To store the model's Z depth when grabbed (kept for backward compatibility)
+        this.handGrabbedModels = [null, null]; // Array to track which model each hand (0, 1) is grabbing
+        this.handModelDragOffsets = [new THREE.Vector3(), new THREE.Vector3()]; // Drag offsets for each hand
+        this.handModelGrabStartDepths = [0, 0]; // Grab start depths for each hand
+        this.handRotateLastX = [null, null]; // Last X position for rotation for each hand
         this.interactionMode = 'drag'; // 'drag', 'rotate', 'scale', 'animate' - Default to drag
         this.interactionModeButtons = {}; // To store references to mode buttons
         this.loadedDroppedModelData = null; // To temporarily store parsed GLTF data
@@ -1075,11 +1079,16 @@ export var Game = /*#__PURE__*/ function() {
                                 if (_this1.interactionMode === 'animate') {
                                     // Release any model grab from other modes
                                     if (_this1.grabbingHandIndex !== -1 && _this1.pickedUpModel) {
-                                        // console.log(`Switched to Animate mode or model grab was active. Releasing.`);
                                         _this1.grabbingHandIndex = -1;
                                         _this1.pickedUpModel = null;
-                                        // if (this.grabMarker && this.pandaModel) this.grabMarker.visible = true; // Grab marker removed
-                                        // Reset other mode-specific states
+                                        _this1.handGrabbedModels[0] = null;
+                                        _this1.handGrabbedModels[1] = null;
+                                        _this1.handModelDragOffsets[0].set(0, 0, 0);
+                                        _this1.handModelDragOffsets[1].set(0, 0, 0);
+                                        _this1.handModelGrabStartDepths[0] = 0;
+                                        _this1.handModelGrabStartDepths[1] = 0;
+                                        _this1.handRotateLastX[0] = null;
+                                        _this1.handRotateLastX[1] = null;
                                         _this1.rotateLastHandX = null;
                                         _this1.scaleInitialPinchDistance = null;
                                         _this1.scaleInitialModelScale = null;
@@ -1131,75 +1140,82 @@ export var Game = /*#__PURE__*/ function() {
                                 } else if (_this1.interactionMode === 'drag') {
                                     if (hand.isPinching) {
                                         if (!prevIsPinching && _this1.interactiveModels.length > 0) {
-                                            var pickedModel = _this1._findClosestModelToHand(hand);
+                                            var pickedModel = _this1._findClosestModelToHand(hand, i);
                                             if (pickedModel) {
+                                                _this1.handGrabbedModels[i] = pickedModel;
                                                 _this1.grabbingHandIndex = i;
                                                 _this1.pickedUpModel = pickedModel;
-                                                // Convert 2D screen pinch point to 3D world point on a plane
-                                                // The plane is at the model's current Z depth
-                                                _this1.modelGrabStartDepth = _this1.pickedUpModel.position.z; // Store initial depth
+                                                _this1.handModelGrabStartDepths[i] = pickedModel.position.z;
                                                 var pinchX = hand.pinchPointScreen.x;
                                                 var pinchY = hand.pinchPointScreen.y;
-                                                // Convert 2D screen pinch point (origin center) to NDC (Normalized Device Coords, -1 to 1)
                                                 var ndcX = pinchX / (_this1.gameContainer.clientWidth / 2);
                                                 var ndcY = pinchY / (_this1.gameContainer.clientHeight / 2);
-                                                var pinchPoint3DWorld = new THREE.Vector3(ndcX, ndcY, 0.5); // Start with a neutral NDC Z
+                                                var pinchPoint3DWorld = new THREE.Vector3(ndcX, ndcY, 0.5);
                                                 pinchPoint3DWorld.unproject(_this1.camera);
-                                                pinchPoint3DWorld.z = _this1.modelGrabStartDepth; // Force Z to the grab depth
-                                                console.log("Grab screen: (".concat(pinchX.toFixed(2), ", ").concat(pinchY.toFixed(2), "), NDC: (").concat(ndcX.toFixed(2), ", ").concat(ndcY.toFixed(2), ")"));
-                                                console.log("Grab 3D World (pre-offset): ".concat(pinchPoint3DWorld.x.toFixed(2), ", ").concat(pinchPoint3DWorld.y.toFixed(2), ", ").concat(pinchPoint3DWorld.z.toFixed(2)));
-                                                _this1.modelDragOffset.subVectors(_this1.pickedUpModel.position, pinchPoint3DWorld);
-                                                console.log("Hand ".concat(i, " GRABBED model for DRAG at depth ").concat(_this1.modelGrabStartDepth, ". Offset:"), _this1.modelDragOffset.x.toFixed(2), _this1.modelDragOffset.y.toFixed(2), _this1.modelDragOffset.z.toFixed(2));
+                                                pinchPoint3DWorld.z = _this1.handModelGrabStartDepths[i];
+                                                _this1.handModelDragOffsets[i].subVectors(pickedModel.position, pinchPoint3DWorld);
+                                                _this1.modelDragOffset.copy(_this1.handModelDragOffsets[i]);
+                                                _this1.modelGrabStartDepth = _this1.handModelGrabStartDepths[i];
+                                                console.log("Hand ".concat(i, " GRABBED model for DRAG at depth ").concat(_this1.handModelGrabStartDepths[i]));
                                             }
-                                        } else if (_this1.grabbingHandIndex === i && _this1.pickedUpModel) {
-                                            // Update model position based on pinch
+                                        } else if (_this1.handGrabbedModels[i]) {
+                                            var grabbedModel = _this1.handGrabbedModels[i];
                                             var currentPinchX = hand.pinchPointScreen.x;
                                             var currentPinchY = hand.pinchPointScreen.y;
                                             var currentNdcX = currentPinchX / (_this1.gameContainer.clientWidth / 2);
                                             var currentNdcY = currentPinchY / (_this1.gameContainer.clientHeight / 2);
                                             var newPinchPoint3DWorld = new THREE.Vector3(currentNdcX, currentNdcY, 0.5);
                                             newPinchPoint3DWorld.unproject(_this1.camera);
-                                            newPinchPoint3DWorld.z = _this1.modelGrabStartDepth; // Force Z to the original grab depth plane
-                                            _this1.pickedUpModel.position.addVectors(newPinchPoint3DWorld, _this1.modelDragOffset);
+                                            newPinchPoint3DWorld.z = _this1.handModelGrabStartDepths[i];
+                                            grabbedModel.position.addVectors(newPinchPoint3DWorld, _this1.handModelDragOffsets[i]);
                                             var minZ = -200;
                                             var maxZ = 50;
-                                            _this1.pickedUpModel.position.z = Math.max(minZ, Math.min(maxZ, _this1.pickedUpModel.position.z));
+                                            grabbedModel.position.z = Math.max(minZ, Math.min(maxZ, grabbedModel.position.z));
                                         }
                                     } else {
-                                        if (prevIsPinching && _this1.grabbingHandIndex === i) {
-                                            console.log("Hand ".concat(i, " RELEASED model (Drag mode) at position:"), _this1.pickedUpModel.position);
-                                            _this1.grabbingHandIndex = -1;
-                                            _this1.pickedUpModel = null;
-                                        // if (this.grabMarker && this.pandaModel) this.grabMarker.visible = true; // Show marker when released - Grab marker removed
+                                        if (prevIsPinching && _this1.handGrabbedModels[i]) {
+                                            console.log("Hand ".concat(i, " RELEASED model (Drag mode) at position:"), _this1.handGrabbedModels[i].position);
+                                            _this1.handGrabbedModels[i] = null;
+                                            _this1.handModelDragOffsets[i].set(0, 0, 0);
+                                            _this1.handModelGrabStartDepths[i] = 0;
+                                            if (_this1.grabbingHandIndex === i) {
+                                                _this1.grabbingHandIndex = -1;
+                                                _this1.pickedUpModel = null;
+                                            }
                                         }
                                     }
                                 } else if (_this1.interactionMode === 'rotate') {
                                     if (hand.isPinching) {
                                         if (!prevIsPinching && _this1.interactiveModels.length > 0) {
-                                            var pickedModel = _this1._findClosestModelToHand(hand);
+                                            var pickedModel = _this1._findClosestModelToHand(hand, i);
                                             if (pickedModel) {
+                                                _this1.handGrabbedModels[i] = pickedModel;
                                                 _this1.grabbingHandIndex = i;
                                                 _this1.pickedUpModel = pickedModel;
-                                            }
-                                            if (_this1.pickedUpModel) {
-                                                _this1.rotateLastHandX = hand.pinchPointScreen.x; // Store initial pinch X for delta calculation
+                                                _this1.handRotateLastX[i] = hand.pinchPointScreen.x;
+                                                _this1.rotateLastHandX = _this1.handRotateLastX[i];
                                                 console.log("Hand ".concat(i, " INITIATED ROTATION on model via pinch from anywhere."));
                                             }
-                                        } else if (_this1.grabbingHandIndex === i && _this1.pickedUpModel && _this1.rotateLastHandX !== null) {
-                                            var currentHandX = hand.pinchPointScreen.x; // Use pinch point X for delta
-                                            var deltaX = currentHandX - _this1.rotateLastHandX;
-                                            if (_this1.pickedUpModel && Math.abs(deltaX) > 0.5) {
-                                                _this1.pickedUpModel.rotation.y -= deltaX * _this1.rotateSensitivity;
+                                        } else if (_this1.handGrabbedModels[i] && _this1.handRotateLastX[i] !== null) {
+                                            var grabbedModel = _this1.handGrabbedModels[i];
+                                            var currentHandX = hand.pinchPointScreen.x;
+                                            var deltaX = currentHandX - _this1.handRotateLastX[i];
+                                            if (grabbedModel && Math.abs(deltaX) > 0.5) {
+                                                grabbedModel.rotation.y -= deltaX * _this1.rotateSensitivity;
                                             }
+                                            _this1.handRotateLastX[i] = currentHandX;
                                             _this1.rotateLastHandX = currentHandX;
                                         }
                                     } else {
-                                        if (prevIsPinching && _this1.grabbingHandIndex === i) {
+                                        if (prevIsPinching && _this1.handGrabbedModels[i]) {
                                             console.log("Hand ".concat(i, " RELEASED ROTATION on model (pinch ended)."));
-                                            _this1.grabbingHandIndex = -1;
-                                            _this1.pickedUpModel = null;
-                                            _this1.rotateLastHandX = null;
-                                        // if (this.grabMarker && this.pandaModel) this.grabMarker.visible = true; // Grab marker removed
+                                            _this1.handGrabbedModels[i] = null;
+                                            _this1.handRotateLastX[i] = null;
+                                            if (_this1.grabbingHandIndex === i) {
+                                                _this1.grabbingHandIndex = -1;
+                                                _this1.pickedUpModel = null;
+                                                _this1.rotateLastHandX = null;
+                                            }
                                         }
                                     }
                                 } else if (_this1.interactionMode === 'scale') {
@@ -1253,17 +1269,17 @@ export var Game = /*#__PURE__*/ function() {
                                 }
                                 _this1._updateHandLines(i, smoothedLandmarks, videoParams, canvasWidth, canvasHeight);
                             } else {
-                                if (hand.isPinching && _this1.grabbingHandIndex === i && _this1.interactionMode === 'drag') {
-                                    console.log("Hand ".concat(i, " (which was grabbing for drag) disappeared. Releasing model."));
-                                    _this1.grabbingHandIndex = -1;
-                                    _this1.pickedUpModel = null;
-                                // if (this.grabMarker && this.pandaModel) this.grabMarker.visible = true; // Grab marker removed
-                                } else if (_this1.hands[i].isPinching && _this1.grabbingHandIndex === i && _this1.interactionMode === 'rotate') {
-                                    console.log("Hand ".concat(i, " (which was pinching for rotate) disappeared. Releasing model."));
-                                    _this1.grabbingHandIndex = -1;
-                                    _this1.pickedUpModel = null;
-                                    _this1.rotateLastHandX = null;
-                                // if (this.grabMarker && this.pandaModel) this.grabMarker.visible = true; // Grab marker removed
+                                if (_this1.handGrabbedModels[i] && (_this1.interactionMode === 'drag' || _this1.interactionMode === 'rotate')) {
+                                    console.log("Hand ".concat(i, " (which was grabbing) disappeared. Releasing model."));
+                                    _this1.handGrabbedModels[i] = null;
+                                    _this1.handModelDragOffsets[i].set(0, 0, 0);
+                                    _this1.handModelGrabStartDepths[i] = 0;
+                                    _this1.handRotateLastX[i] = null;
+                                    if (_this1.grabbingHandIndex === i) {
+                                        _this1.grabbingHandIndex = -1;
+                                        _this1.pickedUpModel = null;
+                                        _this1.rotateLastHandX = null;
+                                    }
                                 } else if (_this1.interactionMode === 'scale' && _this1.scaleInitialPinchDistance !== null && (i === 0 || i === 1)) {
                                     var _this_hands_, _this_hands_1;
                                     var hand0Exists = (_this_hands_ = _this1.hands[0]) === null || _this_hands_ === void 0 ? void 0 : _this_hands_.landmarks;
@@ -1285,7 +1301,7 @@ export var Game = /*#__PURE__*/ function() {
                             // Play interaction click sound for this hand if applicable (not for scale, handled after loop)
                             var isThisHandActivelyInteractingForSound = false;
                             if (_this1.interactionMode === 'drag' || _this1.interactionMode === 'rotate') {
-                                isThisHandActivelyInteractingForSound = _this1.grabbingHandIndex === i && _this1.pickedUpModel === _this1.pandaModel;
+                                isThisHandActivelyInteractingForSound = _this1.handGrabbedModels[i] === _this1.pandaModel;
                             } else if (_this1.interactionMode === 'animate') {
                                 isThisHandActivelyInteractingForSound = _this1.animationControlHandIndex === i;
                             }
@@ -1342,9 +1358,12 @@ export var Game = /*#__PURE__*/ function() {
         },
         {
             key: "_findClosestModelToHand",
-            value: function _findClosestModelToHand(hand) {
+            value: function _findClosestModelToHand(hand, handIndex) {
                 if (!hand || !hand.landmarks || this.interactiveModels.length === 0) {
                     return null;
+                }
+                if (handIndex === undefined) {
+                    handIndex = -1;
                 }
                 var thumbTip = hand.landmarks[4];
                 var indexTip = hand.landmarks[8];
@@ -1352,10 +1371,15 @@ export var Game = /*#__PURE__*/ function() {
                 var canvasHeight = this.gameContainer.clientHeight;
                 var pinchScreenX = ((thumbTip.x + indexTip.x) / 2 * canvasWidth - canvasWidth / 2);
                 var pinchScreenY = (canvasHeight / 2 - (thumbTip.y + indexTip.y) / 2 * canvasHeight);
-                var closestModel = null;
-                var minDistance = Infinity;
+                var modelsWithDistances = [];
+                var otherHandIndex = handIndex >= 0 ? (handIndex === 0 ? 1 : 0) : -1;
+                var otherHandGrabbedModel = otherHandIndex >= 0 ? this.handGrabbedModels[otherHandIndex] : null;
+                var hasMultipleModels = this.interactiveModels.length > 1;
                 for (var i = 0; i < this.interactiveModels.length; i++) {
                     var model = this.interactiveModels[i];
+                    if (otherHandGrabbedModel === model) {
+                        continue;
+                    }
                     var bbox = this._getModelScreenBoundingBox(model);
                     if (!bbox) continue;
                     var closestX = Math.max(bbox.minX, Math.min(pinchScreenX, bbox.maxX));
@@ -1364,12 +1388,47 @@ export var Game = /*#__PURE__*/ function() {
                         Math.pow(pinchScreenX - closestX, 2) +
                         Math.pow(pinchScreenY - closestY, 2)
                     );
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        closestModel = model;
+                    var isPandaModel = model === this.pandaModel;
+                    var distanceMultiplier = 1.0;
+                    var handPreferenceBonus = 0;
+                    if (hasMultipleModels && handIndex >= 0) {
+                        var otherHandHasPanda = otherHandGrabbedModel === this.pandaModel;
+                        if (handIndex === 0) {
+                            if (isPandaModel) {
+                                handPreferenceBonus = -2000;
+                                distanceMultiplier = 0.1;
+                            } else {
+                                distanceMultiplier = 5.0;
+                                if (otherHandHasPanda) {
+                                    handPreferenceBonus = -500;
+                                }
+                            }
+                        } else if (handIndex === 1) {
+                            if (!isPandaModel) {
+                                handPreferenceBonus = -2000;
+                                distanceMultiplier = 0.1;
+                            } else {
+                                distanceMultiplier = 5.0;
+                                if (!otherHandHasPanda && otherHandGrabbedModel) {
+                                    handPreferenceBonus = -500;
+                                }
+                            }
+                        }
                     }
+                    var adjustedDistance = (distance * distanceMultiplier) + handPreferenceBonus;
+                    modelsWithDistances.push({
+                        model: model,
+                        distance: distance,
+                        adjustedDistance: adjustedDistance
+                    });
                 }
-                return closestModel;
+                if (modelsWithDistances.length === 0) {
+                    return null;
+                }
+                modelsWithDistances.sort(function(a, b) {
+                    return a.adjustedDistance - b.adjustedDistance;
+                });
+                return modelsWithDistances[0].model;
             }
         },
         {
@@ -1611,7 +1670,7 @@ export var Game = /*#__PURE__*/ function() {
                 // Determine if this specific hand is currently involved in a grab/scale interaction
                 var isThisHandActivelyInteracting = false;
                 if (this.interactionMode === 'drag' || this.interactionMode === 'rotate') {
-                    isThisHandActivelyInteracting = this.grabbingHandIndex === handIndex && this.pickedUpModel === this.pandaModel;
+                    isThisHandActivelyInteracting = this.handGrabbedModels[handIndex] === this.pandaModel;
                 } else if (this.interactionMode === 'scale') {
                     // For scale, both hands involved show the effect if scaling is active
                     isThisHandActivelyInteracting = this.scaleInitialPinchDistance !== null && (handIndex === 0 || handIndex === 1);
@@ -2466,10 +2525,17 @@ export var Game = /*#__PURE__*/ function() {
                     console.log("Interaction mode changed while grabbing. Releasing model from hand ".concat(this.grabbingHandIndex, "."));
                     this.grabbingHandIndex = -1;
                     this.pickedUpModel = null;
+                    this.handGrabbedModels[0] = null;
+                    this.handGrabbedModels[1] = null;
+                    this.handModelDragOffsets[0].set(0, 0, 0);
+                    this.handModelDragOffsets[1].set(0, 0, 0);
+                    this.handModelGrabStartDepths[0] = 0;
+                    this.handModelGrabStartDepths[1] = 0;
+                    this.handRotateLastX[0] = null;
+                    this.handRotateLastX[1] = null;
                     this.rotateLastHandX = null;
-                    this.scaleInitialPinchDistance = null; // Reset scaling variables
+                    this.scaleInitialPinchDistance = null;
                     this.scaleInitialModelScale = null;
-                // if (this.grabMarker && this.pandaModel) this.grabMarker.visible = true; // Grab marker removed
                 }
                 this._updateHandMaterialsForMode(mode); // Update hand colors for new mode
                 this._updateInteractionModeButtonStyles();
@@ -2743,6 +2809,14 @@ export var Game = /*#__PURE__*/ function() {
                         // 6. Reset interaction states
                         _this.grabbingHandIndex = -1;
                         _this.pickedUpModel = null;
+                        _this.handGrabbedModels[0] = null;
+                        _this.handGrabbedModels[1] = null;
+                        _this.handModelDragOffsets[0].set(0, 0, 0);
+                        _this.handModelDragOffsets[1].set(0, 0, 0);
+                        _this.handModelGrabStartDepths[0] = 0;
+                        _this.handModelGrabStartDepths[1] = 0;
+                        _this.handRotateLastX[0] = null;
+                        _this.handRotateLastX[1] = null;
                         _this.rotateLastHandX = null;
                         _this.scaleInitialPinchDistance = null;
                         _this.scaleInitialModelScale = null;
