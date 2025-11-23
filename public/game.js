@@ -178,13 +178,14 @@ import { OnboardingHands } from './OnboardingHands.js';
 
 export var Game = /*#__PURE__*/ function() {
     "use strict";
-    function Game(renderDiv, selectedCharacter, selectedBackground, onReadyCallback) {
+    function Game(renderDiv, selectedCharacter, selectedBackground, onReadyCallback, skipOnboarding) {
         var _this = this;
         _class_call_check(this, Game);
         this.renderDiv = renderDiv;
         this.selectedCharacter = selectedCharacter || 'red'; // Default to 'red' if not provided
         this.selectedBackground = selectedBackground || 'desert'; // Default to 'desert' if not provided
         this.onReadyCallback = onReadyCallback || null; // Callback when game is fully loaded
+        this.skipOnboarding = skipOnboarding || false; // Skip onboarding if user already registered
         console.log('Game initialized with selectedCharacter:', this.selectedCharacter, 'and selectedBackground:', this.selectedBackground);
         this.scene = null;
         this.camera = null;
@@ -337,8 +338,8 @@ export var Game = /*#__PURE__*/ function() {
                                 window.addEventListener('resize', _this._onResize.bind(_this));
                                 _this.gameState = 'tracking';
                                 _this._animate();
-                                // Start onboarding
-                                if (_this.onboardingHands) {
+                                // Start onboarding (only if not skipped)
+                                if (_this.onboardingHands && !_this.skipOnboarding) {
                                     _this.onboardingHands.startDragOnboarding();
 
                                     // Set interaction mode based on first step (now scaleUp)
@@ -356,6 +357,9 @@ export var Game = /*#__PURE__*/ function() {
                                             _this.onboardingText.style.opacity = '1';
                                         }, 100);
                                     }
+                                } else if (_this.skipOnboarding) {
+                                    // Mark onboarding as completed if skipped
+                                    _this.onboardingCompleted = true;
                                 }
                                 // Call the ready callback if provided
                                 if (_this.onReadyCallback) {
@@ -1908,7 +1912,7 @@ export var Game = /*#__PURE__*/ function() {
                         _this._onPTTResponse(response);
                     }
                 );
-                
+                // Initialize speech bubble with "..." and apply initial appearance
                 if (this.speechBubble) {
                     this.speechBubble.innerHTML = "...";
                     this.speechBubble.style.opacity = '0.7';
@@ -2118,8 +2122,18 @@ export var Game = /*#__PURE__*/ function() {
                     case 'tulio':
                         this._createTulio();
                         break;
+                    case 'espacio':
                     case 'space':
-                        this._changeBackgroundToSpace();
+                        this._changeBackground('space');
+                        break;
+                    case 'desierto':
+                    case 'desert':
+                        this._changeBackground('desert');
+                        break;
+                    case 'nieve':
+                    case 'invierno':
+                    case 'snow':
+                        this._changeBackground('snow');
                         break;
                     default:
                         console.warn('Unknown intent command:', command);
@@ -2127,11 +2141,24 @@ export var Game = /*#__PURE__*/ function() {
             }
         },
         {
-            key: "_changeBackgroundToSpace",
-            value: function _changeBackgroundToSpace() {
+            key: "_changeBackground",
+            value: function _changeBackground(backgroundName) {
                 var _this = this;
                 if (!this.scene || !this.camera) {
                     console.warn('Scene or camera not ready yet');
+                    return;
+                }
+
+                // Map background names to file names
+                var backgroundFiles = {
+                    'space': 'space.png',
+                    'desert': 'desert.jpg',
+                    'snow': 'snow.jpg'
+                };
+
+                var fileName = backgroundFiles[backgroundName];
+                if (!fileName) {
+                    console.warn('Unknown background:', backgroundName);
                     return;
                 }
 
@@ -2158,8 +2185,12 @@ export var Game = /*#__PURE__*/ function() {
                 // Change background during flash peak
                 setTimeout(function() {
                     var textureLoader = new THREE.TextureLoader();
-                    textureLoader.load('assets/space.png', function(texture) {
+                    textureLoader.load('assets/' + fileName, function(texture) {
                         _this.scene.background = texture;
+                        _this.selectedBackground = backgroundName; // Update current background
+                        console.log('Background changed to:', backgroundName);
+                    }, undefined, function(error) {
+                        console.error('Error loading background:', error);
                     });
                 }, 200);
 
@@ -2173,6 +2204,13 @@ export var Game = /*#__PURE__*/ function() {
                 setTimeout(function() {
                     document.body.removeChild(flash);
                 }, 900);
+            }
+        },
+        {
+            key: "_changeBackgroundToSpace",
+            value: function _changeBackgroundToSpace() {
+                // Legacy function - calls generic background changer
+                this._changeBackground('space');
             }
         },
         {

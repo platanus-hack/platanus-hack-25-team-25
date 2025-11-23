@@ -206,7 +206,18 @@ export var SpeechManager = /*#__PURE__*/ function() {
                             'espacio': 'space',
                             'space': 'space',
                             'espacial': 'space',
-                            'cosmos': 'space'
+                            'cosmos': 'space',
+                            'desierto': 'desert',
+                            'desert': 'desert',
+                            'arena': 'desert',
+                            'sahara': 'desert',
+                            'nieve': 'snow',
+                            'snow': 'snow',
+                            'invierno': 'snow',
+                            'hielo': 'snow',
+                            'frío': 'snow',
+                            'frio': 'snow',
+                            'navidad': 'snow'
                         };
                         var spokenCommands = Object.keys(commandMap);
                         var _iteratorNormalCompletion = true, _didIteratorError = false, _iteratorError = undefined;

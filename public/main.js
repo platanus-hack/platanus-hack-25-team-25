@@ -3,12 +3,60 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/loaders/GLTFLoader.js';
 
 // Character Selection Logic
+var nameInput = document.getElementById('nameInput');
 var characterSelection = document.getElementById('characterSelection');
 var backgroundSelection = document.getElementById('backgroundSelection');
 var renderDiv = document.getElementById('renderDiv');
 var selectedCharacter = null;
 var selectedBackground = null;
 var game = null;
+
+// Check localStorage for existing user
+function checkExistingUser() {
+    var savedName = localStorage.getItem('playerName');
+
+    if (savedName) {
+        // User exists, skip name input and go to character selection
+        characterSelection.style.display = 'flex';
+        // Initialize previews after showing the screen
+        setTimeout(function() {
+            initializeCharacterPreviews();
+        }, 50);
+    } else {
+        // New user, show name input
+        nameInput.style.display = 'flex';
+    }
+}
+
+// Handle name submission
+var nameSubmitBtn = document.getElementById('nameSubmit');
+if (nameSubmitBtn) {
+    nameSubmitBtn.addEventListener('click', function() {
+        var playerNameInput = document.getElementById('playerName');
+        var playerName = playerNameInput.value.trim();
+
+        if (playerName) {
+            // Save name to localStorage
+            localStorage.setItem('playerName', playerName);
+
+            // Hide name input
+            nameInput.style.display = 'none';
+
+            // Show character selection
+            characterSelection.style.display = 'flex';
+
+            // Initialize previews after showing the screen
+            setTimeout(function() {
+                initializeCharacterPreviews();
+            }, 50);
+        } else {
+            alert('Por favor ingresa tu nombre');
+        }
+    });
+}
+
+// Initialize on page load
+checkExistingUser();
 
 // Create preview scenes for each character
 function createCharacterPreview(character, containerId) {
@@ -70,9 +118,15 @@ function createCharacterPreview(character, containerId) {
     });
 }
 
-// Initialize character previews
-createCharacterPreview('red', 'red-preview');
-createCharacterPreview('bumblebee', 'bumblebee-preview');
+// Initialize character previews (will be called when character selection is shown)
+var previewsInitialized = false;
+function initializeCharacterPreviews() {
+    if (!previewsInitialized) {
+        createCharacterPreview('red', 'red-preview');
+        createCharacterPreview('bumblebee', 'bumblebee-preview');
+        previewsInitialized = true;
+    }
+}
 
 // Handle character selection
 var characterSelectButtons = document.querySelectorAll('#characterSelection .select-btn');
@@ -122,6 +176,10 @@ backgroundSelectButtons.forEach(function(button) {
                 console.error('Fatal Error: renderDiv element not found.');
             } else {
                 console.log('Initializing Game with character:', selectedCharacter, 'and background:', selectedBackground);
+
+                // Check if user already has a name (skip onboarding if they do)
+                var skipOnboarding = localStorage.getItem('playerName') !== null;
+
                 game = new Game(renderDiv, selectedCharacter, selectedBackground, function() {
                     // Callback when game is fully loaded
                     if (loadingScreen) {
@@ -130,7 +188,7 @@ backgroundSelectButtons.forEach(function(button) {
                             loadingScreen.style.display = 'none';
                         }, 500); // Wait for fade-out animation
                     }
-                });
+                }, skipOnboarding);
                 game.start();
             }
         }, 100);

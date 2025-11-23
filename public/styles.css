@@ -45,6 +45,44 @@
     font-size: 2em;
 }
 
+/* Name Input Screen */
+.name-input {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.name-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.name-form input {
+    padding: 15px 25px;
+    font-size: 20px;
+    font-family: "Arial", "Helvetica Neue", Helvetica, sans-serif;
+    border: 3px solid black;
+    border-radius: 8px;
+    box-shadow: 4px 4px 0px black;
+    width: 300px;
+    text-align: center;
+}
+
+.name-form input:focus {
+    outline: none;
+    border-color: #764ba2;
+}
+
 /* Character Selection Screen */
 .character-selection {
     position: fixed;
