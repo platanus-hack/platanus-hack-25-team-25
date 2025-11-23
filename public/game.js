@@ -1917,6 +1917,16 @@ export var Game = /*#__PURE__*/ function() {
                         _this._setInteractionMode(command.toLowerCase());
                     } else if (command.toLowerCase() === 'greet') {
                         _this._playAnimation('TensionFrontWave', true);
+                    } else if (command.toLowerCase() === 'dragon') {
+                        _this._createDragon();
+                    } else if (command.toLowerCase() === 'monkey') {
+                        _this._createMonkey();
+                    } else if (command.toLowerCase() === 'platano') {
+                        _this._createPlatano();
+                    } else if (command.toLowerCase() === 'astronaut') {
+                        _this._createAstronaut();
+                    } else if (command.toLowerCase() === 'space') {
+                        _this._changeBackgroundToSpace();
                     }
                 });
                 // Initialize speech bubble with "..." and apply initial appearance
@@ -2014,9 +2024,61 @@ export var Game = /*#__PURE__*/ function() {
                     case 'astronaut':
                         this._createAstronaut();
                         break;
+                    case 'space':
+                        this._changeBackgroundToSpace();
+                        break;
                     default:
                         console.warn('Unknown intent command:', command);
                 }
+            }
+        },
+        {
+            key: "_changeBackgroundToSpace",
+            value: function _changeBackgroundToSpace() {
+                var _this = this;
+                if (!this.scene || !this.camera) {
+                    console.warn('Scene or camera not ready yet');
+                    return;
+                }
+
+                // Create white flash overlay
+                var flash = document.createElement('div');
+                flash.style.position = 'fixed';
+                flash.style.top = '0';
+                flash.style.left = '0';
+                flash.style.width = '100%';
+                flash.style.height = '100%';
+                flash.style.backgroundColor = 'white';
+                flash.style.opacity = '0';
+                flash.style.pointerEvents = 'none';
+                flash.style.zIndex = '9999';
+                flash.style.transition = 'opacity 0.3s ease-out';
+
+                document.body.appendChild(flash);
+
+                // Flash to white
+                setTimeout(function() {
+                    flash.style.opacity = '1';
+                }, 10);
+
+                // Change background during flash peak
+                setTimeout(function() {
+                    var textureLoader = new THREE.TextureLoader();
+                    textureLoader.load('assets/space.png', function(texture) {
+                        _this.scene.background = texture;
+                    });
+                }, 200);
+
+                // Fade out flash
+                setTimeout(function() {
+                    flash.style.transition = 'opacity 0.5s ease-in';
+                    flash.style.opacity = '0';
+                }, 300);
+
+                // Remove flash element
+                setTimeout(function() {
+                    document.body.removeChild(flash);
+                }, 900);
             }
         },
         {
