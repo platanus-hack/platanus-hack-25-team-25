@@ -218,8 +218,6 @@ export var Game = /*#__PURE__*/ function() {
         this.smoothingFactor = 0.4; // Alpha for exponential smoothing (0 < alpha <= 1). Smaller = more smoothing.
         this.loadedModels = {};
         this.pandaModel = null; // Add reference for the Panda model
-        this.dragonModel = null; // Add reference for the Dragon model
-        this.monkeyModel = null; // Add reference for the Monkey model
         this.platanoModel = null; // Add reference for the Platano model
         this.astronautModel = null; // Add reference for the Astronaut model
         this.bodoqueModel = null; // Add reference for the Bodoque model
@@ -1927,10 +1925,6 @@ export var Game = /*#__PURE__*/ function() {
                         _this._setInteractionMode(command.toLowerCase());
                     } else if (command.toLowerCase() === 'greet') {
                         _this._playAnimation('TensionFrontWave', true);
-                    } else if (command.toLowerCase() === 'dragon') {
-                        _this._createDragon();
-                    } else if (command.toLowerCase() === 'monkey') {
-                        _this._createMonkey();
                     } else if (command.toLowerCase() === 'platano') {
                         _this._createPlatano();
                     } else if (command.toLowerCase() === 'astronaut') {
@@ -1955,12 +1949,6 @@ export var Game = /*#__PURE__*/ function() {
                 if (!text || !text.trim()) return;
                 
                 var sceneObjects = [];
-                if (this.dragonModel && this.scene && this.scene.children.includes(this.dragonModel)) {
-                    sceneObjects.push('dragón');
-                }
-                if (this.monkeyModel && this.scene && this.scene.children.includes(this.monkeyModel)) {
-                    sceneObjects.push('mono');
-                }
                 if (this.platanoModel && this.scene && this.scene.children.includes(this.platanoModel)) {
                     sceneObjects.push('plátano');
                 }
@@ -2028,12 +2016,6 @@ export var Game = /*#__PURE__*/ function() {
             value: function _handleIntentCommand(command) {
                 console.log('Executing intent command:', command);
                 switch(command.toLowerCase()) {
-                    case 'dragon':
-                        this._createDragon();
-                        break;
-                    case 'monkey':
-                        this._createMonkey();
-                        break;
                     case 'platano':
                         this._createPlatano();
                         break;
@@ -2529,97 +2511,6 @@ export var Game = /*#__PURE__*/ function() {
                     console.error("Critical error during GLTF parsing setup for ".concat(fileName, ":"), e);
                     this._showError('Error al configurar el analizador para "'.concat(fileName, '".'));
                 }
-            }
-        },
-        {
-            key: "_createDragon",
-            value: function _createDragon() {
-                var _this = this;
-                if (this.dragonModel && this.scene && this.scene.children.includes(this.dragonModel)) {
-                    console.log('Dragon already exists in scene');
-                    return;
-                }
-                console.log('Loading dragon model...');
-                var gltfLoader = new GLTFLoader();
-                gltfLoader.load('assets/dragon.gltf', function(gltf) {
-                    _this.dragonModel = gltf.scene;
-                    var box = new THREE.Box3().setFromObject(_this.dragonModel);
-                    var size = box.getSize(new THREE.Vector3());
-                    var center = box.getCenter(new THREE.Vector3());
-                    var scale = 150 / Math.max(size.x, size.y, size.z);
-                    _this.dragonModel.scale.set(0.01, 0.01, 0.01);
-                    _this.dragonModel.position.set(
-                        -center.x * scale + 200,
-                        -center.y * scale,
-                        -800
-                    );
-                    if (_this.scene) {
-                        _this.scene.add(_this.dragonModel);
-                        _this.interactiveModels.push(_this.dragonModel);
-                        console.log('Dragon model loaded and added to scene at position:', _this.dragonModel.position);
-                        var startTime = Date.now();
-                        var duration = 1000;
-                        var targetScale = scale;
-                        var animateDragonEntrance = function() {
-                            var elapsed = Date.now() - startTime;
-                            var progress = Math.min(elapsed / duration, 1);
-                            var easeProgress = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-                            var currentScale = 0.01 + (targetScale - 0.01) * easeProgress;
-                            _this.dragonModel.scale.set(currentScale, currentScale, currentScale);
-                            _this.dragonModel.rotation.y = easeProgress * Math.PI * 2;
-                            if (progress < 1) {
-                                requestAnimationFrame(animateDragonEntrance);
-                            }
-                        };
-                        animateDragonEntrance();
-                    }
-                }, undefined, function(error) {
-                    console.error('Error loading dragon model:', error);
-                });
-            }
-        },
-        {
-            key: "_createMonkey",
-            value: function _createMonkey() {
-                var _this = this;
-                if (this.monkeyModel && this.scene && this.scene.children.includes(this.monkeyModel)) {
-                    return;
-                }
-                var gltfLoader = new GLTFLoader();
-                gltfLoader.load('assets/monkey.gltf', function(gltf) {
-                    _this.monkeyModel = gltf.scene;
-                    var box = new THREE.Box3().setFromObject(_this.monkeyModel);
-                    var size = box.getSize(new THREE.Vector3());
-                    var center = box.getCenter(new THREE.Vector3());
-                    var scale = 150 / Math.max(size.x, size.y, size.z);
-                    _this.monkeyModel.scale.set(0.01, 0.01, 0.01);
-                    _this.monkeyModel.position.set(
-                        -center.x * scale - 200,
-                        -center.y * scale,
-                        -800
-                    );
-                    if (_this.scene) {
-                        _this.scene.add(_this.monkeyModel);
-                        _this.interactiveModels.push(_this.monkeyModel);
-                        var startTime = Date.now();
-                        var duration = 1000;
-                        var targetScale = scale;
-                        var animateMonkeyEntrance = function() {
-                            var elapsed = Date.now() - startTime;
-                            var progress = Math.min(elapsed / duration, 1);
-                            var easeProgress = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-                            var currentScale = 0.01 + (targetScale - 0.01) * easeProgress;
-                            _this.monkeyModel.scale.set(currentScale, currentScale, currentScale);
-                            _this.monkeyModel.rotation.y = easeProgress * Math.PI * 2;
-                            if (progress < 1) {
-                                requestAnimationFrame(animateMonkeyEntrance);
-                            }
-                        };
-                        animateMonkeyEntrance();
-                    }
-                }, undefined, function(error) {
-                    console.error('Error loading monkey model:', error);
-                });
             }
         },
         {
