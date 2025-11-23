@@ -206,7 +206,11 @@ export var SpeechManager = /*#__PURE__*/ function() {
                             'astronauta': 'astronaut',
                             'astronaut': 'astronaut',
                             'astronautas': 'astronaut',
-                            'cosmonauta': 'astronaut'
+                            'cosmonauta': 'astronaut',
+                            'espacio': 'space',
+                            'space': 'space',
+                            'espacial': 'space',
+                            'cosmos': 'space'
                         };
                         var spokenCommands = Object.keys(commandMap);
                         var _iteratorNormalCompletion = true, _didIteratorError = false, _iteratorError = undefined;
