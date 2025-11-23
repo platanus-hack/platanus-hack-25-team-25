@@ -11,10 +11,6 @@ const __dirname = dirname(__filename);
 
 dotenv.config();
 
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-  process.env.GOOGLE_APPLICATION_CREDENTIALS = join(__dirname, 'service-account.json');
-}
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -22,7 +18,30 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const ELEVEN_API_KEY = process.env.ELEVEN_API_KEY || process.env.ELEVENLABS_API_KEY;
 const ELEVEN_VOICE_ID = process.env.ELEVEN_VOICE_ID || process.env.ELEVENLABS_VOICE_ID;
 
-const speechClient = new SpeechClient();
+// Initialize Speech Client with credentials from env or file
+let speechClient;
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+  const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON);
+  speechClient = new SpeechClient({ credentials });
+} else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  // Check if it's JSON content or a file path
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS.trim().startsWith('{')) {
+    // It's JSON content, parse it
+    const credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+    speechClient = new SpeechClient({ credentials });
+  } else {
+    // It's a file path
+    const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS.startsWith('/') 
+      ? process.env.GOOGLE_APPLICATION_CREDENTIALS 
+      : join(__dirname, process.env.GOOGLE_APPLICATION_CREDENTIALS);
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
+    speechClient = new SpeechClient();
+  }
+} else {
+  const credentialsPath = join(__dirname, 'service-account.json');
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = credentialsPath;
+  speechClient = new SpeechClient();
+}
 
 // Using gemini-flash-latest (gemini-2.5-flash) as required
 // Note: This model uses ~149 thinking tokens, so we need higher maxOutputTokens
