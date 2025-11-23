@@ -18,6 +18,8 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const ELEVEN_API_KEY = process.env.ELEVEN_API_KEY || process.env.ELEVENLABS_API_KEY;
 const ELEVEN_VOICE_ID = process.env.ELEVEN_VOICE_ID || process.env.ELEVENLABS_VOICE_ID;
 
+console.log("process.env", process.env);
+
 console.log("GEMINI_API_KEY present?", !!process.env.GEMINI_API_KEY);
 console.log("GEMINI_API_KEY length:", process.env.GEMINI_API_KEY?.length || 0);
 
