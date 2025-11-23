@@ -2902,7 +2902,7 @@ export var Game = /*#__PURE__*/ function() {
                     var box = new THREE.Box3().setFromObject(_this.platanoModel);
                     var size = box.getSize(new THREE.Vector3());
                     var center = box.getCenter(new THREE.Vector3());
-                    var scale = 150 / Math.max(size.x, size.y, size.z);
+                    var scale = 280 / Math.max(size.x, size.y, size.z);
                     _this.platanoModel.scale.set(0.01, 0.01, 0.01);
                     _this.platanoModel.position.set(
                         -center.x * scale,
@@ -2996,7 +2996,7 @@ export var Game = /*#__PURE__*/ function() {
                     var box = new THREE.Box3().setFromObject(_this.bodoqueModel);
                     var size = box.getSize(new THREE.Vector3());
                     var center = box.getCenter(new THREE.Vector3());
-                    var scale = 150 / Math.max(size.x, size.y, size.z);
+                    var scale = 280 / Math.max(size.x, size.y, size.z);
                     _this.bodoqueModel.scale.set(0.01, 0.01, 0.01);
                     _this.bodoqueModel.position.set(
                         -center.x * scale,
@@ -3045,7 +3045,7 @@ export var Game = /*#__PURE__*/ function() {
                     var box = new THREE.Box3().setFromObject(_this.tulioModel);
                     var size = box.getSize(new THREE.Vector3());
                     var center = box.getCenter(new THREE.Vector3());
-                    var scale = 150 / Math.max(size.x, size.y, size.z);
+                    var scale = 280 / Math.max(size.x, size.y, size.z);
                     _this.tulioModel.scale.set(0.1, 0.1, 0.1);
                     _this.tulioModel.position.set(
                         -center.x * scale,
