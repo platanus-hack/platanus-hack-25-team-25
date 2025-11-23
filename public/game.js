@@ -1934,7 +1934,11 @@ export var Game = /*#__PURE__*/ function() {
                     } else if (command.toLowerCase() === 'astronaut') {
                         _this._createAstronaut();
                     } else if (command.toLowerCase() === 'space') {
-                        _this._changeBackgroundToSpace();
+                        _this._changeBackground('space');
+                    } else if (command.toLowerCase() === 'desert') {
+                        _this._changeBackground('desert');
+                    } else if (command.toLowerCase() === 'snow') {
+                        _this._changeBackground('snow');
                     }
                 });
                 // Initialize speech bubble with "..." and apply initial appearance
@@ -2033,7 +2037,17 @@ export var Game = /*#__PURE__*/ function() {
                         this._createTulio();
                         break;
                     case 'espacio':
-                        this._changeBackgroundToSpace();
+                    case 'space':
+                        this._changeBackground('space');
+                        break;
+                    case 'desierto':
+                    case 'desert':
+                        this._changeBackground('desert');
+                        break;
+                    case 'nieve':
+                    case 'invierno':
+                    case 'snow':
+                        this._changeBackground('snow');
                         break;
                     default:
                         console.warn('Unknown intent command:', command);
@@ -2041,11 +2055,24 @@ export var Game = /*#__PURE__*/ function() {
             }
         },
         {
-            key: "_changeBackgroundToSpace",
-            value: function _changeBackgroundToSpace() {
+            key: "_changeBackground",
+            value: function _changeBackground(backgroundName) {
                 var _this = this;
                 if (!this.scene || !this.camera) {
                     console.warn('Scene or camera not ready yet');
+                    return;
+                }
+
+                // Map background names to file names
+                var backgroundFiles = {
+                    'space': 'space.png',
+                    'desert': 'desert.jpg',
+                    'snow': 'snow.jpg'
+                };
+
+                var fileName = backgroundFiles[backgroundName];
+                if (!fileName) {
+                    console.warn('Unknown background:', backgroundName);
                     return;
                 }
 
@@ -2072,8 +2099,12 @@ export var Game = /*#__PURE__*/ function() {
                 // Change background during flash peak
                 setTimeout(function() {
                     var textureLoader = new THREE.TextureLoader();
-                    textureLoader.load('assets/space.png', function(texture) {
+                    textureLoader.load('assets/' + fileName, function(texture) {
                         _this.scene.background = texture;
+                        _this.selectedBackground = backgroundName; // Update current background
+                        console.log('Background changed to:', backgroundName);
+                    }, undefined, function(error) {
+                        console.error('Error loading background:', error);
                     });
                 }, 200);
 
@@ -2087,6 +2118,13 @@ export var Game = /*#__PURE__*/ function() {
                 setTimeout(function() {
                     document.body.removeChild(flash);
                 }, 900);
+            }
+        },
+        {
+            key: "_changeBackgroundToSpace",
+            value: function _changeBackgroundToSpace() {
+                // Legacy function - calls generic background changer
+                this._changeBackground('space');
             }
         },
         {
