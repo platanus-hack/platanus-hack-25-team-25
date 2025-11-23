@@ -550,13 +550,25 @@ export var Game = /*#__PURE__*/ function() {
                 this.scene = new THREE.Scene();
                 // Load background texture
                 var textureLoader = new THREE.TextureLoader();
-                var backgroundPath = 'assets/' + this.selectedBackground + '.jpg';
-                textureLoader.load(backgroundPath, function(texture) {
-                    _this.scene.background = texture;
-                    console.log('Background loaded:', backgroundPath);
-                }, undefined, function(error) {
-                    console.error('Error loading background:', error);
-                });
+                var backgroundExtensions = ['.jpg', '.png'];
+                var backgroundPath = null;
+                var extensionIndex = 0;
+                var tryLoadBackground = function() {
+                    if (extensionIndex < backgroundExtensions.length) {
+                        backgroundPath = 'assets/' + _this.selectedBackground + backgroundExtensions[extensionIndex];
+                        textureLoader.load(backgroundPath, function(texture) {
+                            _this.scene.background = texture;
+                            console.log('Background loaded:', backgroundPath);
+                        }, undefined, function(error) {
+                            console.log('Failed to load background with extension', backgroundExtensions[extensionIndex], ', trying next...');
+                            extensionIndex++;
+                            tryLoadBackground();
+                        });
+                    } else {
+                        console.error('Error loading background: Could not find file with .jpg or .png extension for', _this.selectedBackground);
+                    }
+                };
+                tryLoadBackground();
                 // Using OrthographicCamera for a 2D-like overlay effect
                 this.camera = new THREE.OrthographicCamera(width / -2, width / 2, height / 2, height / -2, 1, 2000); // Increased far plane
                 this.camera.position.z = 100; // Position along Z doesn't change scale in Ortho

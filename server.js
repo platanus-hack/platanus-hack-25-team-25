@@ -155,18 +155,33 @@ app.post("/speak", async (req, res) => {
       parts: [{ text: userMessage }]
     });
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     const geminiPayload = {
       contents: chatHistory,
       systemInstruction: {
         parts: [{ text: SYSTEM_PROMPT }]
       },
       generationConfig: {
-        temperature: 0.8,
+        temperature: 1.0,
         topK: 40,
         topP: 0.95,
-        maxOutputTokens: 150,
-        responseMimeType: "application/json"
+        maxOutputTokens: 200,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            text: {
+              type: "string",
+              description: "The response text in Spanish"
+            },
+            command: {
+              type: "string",
+              description: "Optional command to execute (dragon, monkey, platano, astronaut)",
+              nullable: true
+            }
+          },
+          required: ["text"]
+        }
       }
     };
 
