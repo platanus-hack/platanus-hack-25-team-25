@@ -298,12 +298,12 @@ export var Game = /*#__PURE__*/ function() {
         this.animationScrollThreshold = 40; // Pixels of vertical movement to trigger an animation change (Reduced from 50)
         // Pinch stability improvements
         this.pinchStabilityFrames = [0, 0]; // Counter for stable pinch frames per hand
-        this.pinchStabilityThreshold = 2; // Frames needed to confirm pinch (reduced for responsiveness)
+        this.pinchStabilityThreshold = 1; // Frames needed to confirm pinch (minimal delay for responsiveness)
         this.unpinchStabilityFrames = [0, 0]; // Counter for stable unpinch frames per hand
-        this.unpinchStabilityThreshold = 3; // Frames needed to confirm unpinch (increased to prevent accidental release)
+        this.unpinchStabilityThreshold = 3; // Frames needed to confirm unpinch (prevents accidental release)
         this.confirmedPinchState = [false, false]; // Stable pinch state per hand
-        this.maxPickDistance = 150; // Maximum distance in pixels to pick an object
-        this.boundingBoxPadding = 30; // Padding around bounding boxes to make grabbing easier
+        this.maxPickDistance = 250; // Maximum distance in pixels to pick an object
+        this.boundingBoxPadding = 50; // Padding around bounding boxes to make grabbing easier
         // Onboarding system
         this.onboardingHands = null;
         this.onboardingCompleted = false;
@@ -1052,24 +1052,25 @@ export var Game = /*#__PURE__*/ function() {
                                     var unpinchFramesNeeded = isOnboarding ? 2 : _this1.unpinchStabilityThreshold;
                                     
                                     // Temporal filtering for stable pinch detection
-                                    if (rawPinching && !_this1.confirmedPinchState[i]) {
-                                        _this1.pinchStabilityFrames[i]++;
+                                    // Immediate pinch detection, delayed unpinch for stability
+                                    if (rawPinching) {
+                                        if (!_this1.confirmedPinchState[i]) {
+                                            _this1.pinchStabilityFrames[i]++;
+                                            if (_this1.pinchStabilityFrames[i] >= pinchFramesNeeded) {
+                                                _this1.confirmedPinchState[i] = true;
+                                                console.log("Hand ".concat(i, " pinch CONFIRMED"));
+                                            }
+                                        }
                                         _this1.unpinchStabilityFrames[i] = 0;
-                                        if (_this1.pinchStabilityFrames[i] >= pinchFramesNeeded) {
-                                            _this1.confirmedPinchState[i] = true;
-                                            console.log("Hand ".concat(i, " pinch CONFIRMED after ").concat(_this1.pinchStabilityFrames[i], " frames"));
-                                        }
-                                    } else if (!rawPinching && _this1.confirmedPinchState[i]) {
-                                        _this1.unpinchStabilityFrames[i]++;
-                                        _this1.pinchStabilityFrames[i] = 0;
-                                        if (_this1.unpinchStabilityFrames[i] >= unpinchFramesNeeded) {
-                                            _this1.confirmedPinchState[i] = false;
-                                            console.log("Hand ".concat(i, " unpinch CONFIRMED after ").concat(_this1.unpinchStabilityFrames[i], " frames"));
-                                        }
-                                    } else if (rawPinching) {
-                                        _this1.pinchStabilityFrames[i]++;
                                     } else {
-                                        _this1.unpinchStabilityFrames[i]++;
+                                        if (_this1.confirmedPinchState[i]) {
+                                            _this1.unpinchStabilityFrames[i]++;
+                                            if (_this1.unpinchStabilityFrames[i] >= unpinchFramesNeeded) {
+                                                _this1.confirmedPinchState[i] = false;
+                                                console.log("Hand ".concat(i, " unpinch CONFIRMED"));
+                                            }
+                                        }
+                                        _this1.pinchStabilityFrames[i] = 0;
                                     }
                                     
                                     hand.isPinching = _this1.confirmedPinchState[i];
@@ -1194,6 +1195,8 @@ export var Game = /*#__PURE__*/ function() {
                                                 _this1.modelDragOffset.copy(_this1.handModelDragOffsets[i]);
                                                 _this1.modelGrabStartDepth = _this1.handModelGrabStartDepths[i];
                                                 console.log("Hand ".concat(i, " GRABBED model for DRAG at depth ").concat(_this1.handModelGrabStartDepths[i]));
+                                            } else {
+                                                console.log("Hand ".concat(i, " pinch detected but NO model within range for DRAG"));
                                             }
                                         } else if (_this1.handGrabbedModels[i]) {
                                             var grabbedModel = _this1.handGrabbedModels[i];
@@ -1232,6 +1235,8 @@ export var Game = /*#__PURE__*/ function() {
                                                 _this1.handRotateLastX[i] = hand.pinchPointScreen.x;
                                                 _this1.rotateLastHandX = _this1.handRotateLastX[i];
                                                 console.log("Hand ".concat(i, " INITIATED ROTATION on model via pinch."));
+                                            } else {
+                                                console.log("Hand ".concat(i, " pinch detected but NO model within range for ROTATE"));
                                             }
                                         } else if (_this1.handGrabbedModels[i] && _this1.handRotateLastX[i] !== null) {
                                             var grabbedModel = _this1.handGrabbedModels[i];
@@ -1264,17 +1269,15 @@ export var Game = /*#__PURE__*/ function() {
                                         // Both hands are visible and pinching
                                         var dist = hand0.pinchPointScreen.distanceTo(hand1.pinchPointScreen);
                                         if (_this1.scaleInitialPinchDistance === null || _this1.scaleInitialModelScale === null) {
-                                            console.log('Scale mode: both hands pinching, finding closest model...');
                                             var pickedModel = _this1._findClosestModelToPinchMidpoint(hand0, hand1);
                                             if (pickedModel) {
                                                 _this1.scaleInitialPinchDistance = dist;
                                                 _this1.scaleInitialModelScale = pickedModel.scale.clone(); // Store initial scale vector
                                                 _this1.grabbingHandIndex = 0; // Mark as "grabbing" for scaling (using hand 0 as primary)
                                                 _this1.pickedUpModel = pickedModel; // Indicate model is being interacted with
-                                                // if(this.grabMarker) this.grabMarker.visible = false; // Grab marker removed
-                                                console.log("Scaling initiated. Initial pinch dist: ".concat(dist.toFixed(2), ", Initial scale: ").concat(_this1.scaleInitialModelScale.x.toFixed(2)));
+                                                console.log("SCALE initiated. Initial pinch dist: ".concat(dist.toFixed(2), ", Initial scale: ").concat(_this1.scaleInitialModelScale.x.toFixed(2)));
                                             } else {
-                                                console.log('Scale mode: no model found to pick');
+                                                console.log('Both hands pinching but NO model within range for SCALE');
                                             }
                                         } else {
                                             // Continue scaling
