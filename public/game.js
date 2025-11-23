@@ -296,6 +296,14 @@ export var Game = /*#__PURE__*/ function() {
         this.animationControlHandIndex = -1; // Index of the hand controlling animation scrolling
         this.animationControlInitialPinchY = null; // Initial Y position of the pinch for animation scrolling
         this.animationScrollThreshold = 40; // Pixels of vertical movement to trigger an animation change (Reduced from 50)
+        // Pinch stability improvements
+        this.pinchStabilityFrames = [0, 0]; // Counter for stable pinch frames per hand
+        this.pinchStabilityThreshold = 2; // Frames needed to confirm pinch (reduced for responsiveness)
+        this.unpinchStabilityFrames = [0, 0]; // Counter for stable unpinch frames per hand
+        this.unpinchStabilityThreshold = 3; // Frames needed to confirm unpinch (increased to prevent accidental release)
+        this.confirmedPinchState = [false, false]; // Stable pinch state per hand
+        this.maxPickDistance = 150; // Maximum distance in pixels to pick an object
+        this.boundingBoxPadding = 30; // Padding around bounding boxes to make grabbing easier
         // Onboarding system
         this.onboardingHands = null;
         this.onboardingCompleted = false;
@@ -399,10 +407,10 @@ export var Game = /*#__PURE__*/ function() {
                 // User webcam video (corner video)
                 this.videoElement = document.createElement('video');
                 this.videoElement.style.position = 'absolute';
-                this.videoElement.style.bottom = '10px';
-                this.videoElement.style.right = '10px';
-                this.videoElement.style.width = '250px'; // Fixed width for corner video
-                this.videoElement.style.height = '188px'; // Maintain 4:3 aspect ratio (250 * 3/4)
+                this.videoElement.style.top = '10px';
+                this.videoElement.style.left = '10px';
+                this.videoElement.style.width = '25%'; // Percentage width for responsive corner video
+                this.videoElement.style.aspectRatio = '4/3'; // Maintain 4:3 aspect ratio
                 this.videoElement.style.objectFit = 'cover';
                 this.videoElement.style.transform = 'scaleX(-1)'; // Mirror view for intuitive control
                 this.videoElement.style.borderRadius = '8px'; // Rounded corners
@@ -1014,8 +1022,8 @@ export var Game = /*#__PURE__*/ function() {
                                 var handY = (1 - normY_visible) * canvasHeight - canvasHeight / 2;
                                 hand.anchorPos.set(handX, handY, 1);
                                 // Hover detection logic REMOVED
-                                var prevIsPinching = hand.isPinching; // Store previous pinch state
-                                // Pinch detection logic
+                                var prevIsPinching = _this1.confirmedPinchState[i]; // Use stable state instead of raw state
+                                // Pinch detection logic with temporal filtering
                                 var thumbTipLm = smoothedLandmarks[4]; // THUMB_TIP landmark index
                                 var indexTipLm = smoothedLandmarks[8]; // INDEX_FINGER_TIP landmark index
                                 if (thumbTipLm && indexTipLm) {
@@ -1035,15 +1043,44 @@ export var Game = /*#__PURE__*/ function() {
                                     var distanceX = thumbTipScreen.x - indexTipScreen.x;
                                     var distanceY = thumbTipScreen.y - indexTipScreen.y;
                                     var pinchDistance = Math.sqrt(distanceX * distanceX + distanceY * distanceY);
-                                    var pinchThreshold = 45; // Increased from 35. Distance in screen pixels to consider a pinch.
-                                    if (pinchDistance < pinchThreshold) {
-                                        hand.isPinching = true;
-                                        hand.pinchPointScreen.set((thumbTipScreen.x + indexTipScreen.x) / 2, (thumbTipScreen.y + indexTipScreen.y) / 2);
+                                    var pinchThreshold = 48; // Balanced for reliability
+                                    var rawPinching = pinchDistance < pinchThreshold;
+                                    
+                                    // Adjust temporal filtering based on onboarding status
+                                    var isOnboarding = _this1.onboardingHands && !_this1.onboardingCompleted;
+                                    var pinchFramesNeeded = isOnboarding ? 1 : _this1.pinchStabilityThreshold;
+                                    var unpinchFramesNeeded = isOnboarding ? 2 : _this1.unpinchStabilityThreshold;
+                                    
+                                    // Temporal filtering for stable pinch detection
+                                    if (rawPinching && !_this1.confirmedPinchState[i]) {
+                                        _this1.pinchStabilityFrames[i]++;
+                                        _this1.unpinchStabilityFrames[i] = 0;
+                                        if (_this1.pinchStabilityFrames[i] >= pinchFramesNeeded) {
+                                            _this1.confirmedPinchState[i] = true;
+                                            console.log("Hand ".concat(i, " pinch CONFIRMED after ").concat(_this1.pinchStabilityFrames[i], " frames"));
+                                        }
+                                    } else if (!rawPinching && _this1.confirmedPinchState[i]) {
+                                        _this1.unpinchStabilityFrames[i]++;
+                                        _this1.pinchStabilityFrames[i] = 0;
+                                        if (_this1.unpinchStabilityFrames[i] >= unpinchFramesNeeded) {
+                                            _this1.confirmedPinchState[i] = false;
+                                            console.log("Hand ".concat(i, " unpinch CONFIRMED after ").concat(_this1.unpinchStabilityFrames[i], " frames"));
+                                        }
+                                    } else if (rawPinching) {
+                                        _this1.pinchStabilityFrames[i]++;
                                     } else {
-                                        hand.isPinching = false;
+                                        _this1.unpinchStabilityFrames[i]++;
+                                    }
+                                    
+                                    hand.isPinching = _this1.confirmedPinchState[i];
+                                    if (hand.isPinching) {
+                                        hand.pinchPointScreen.set((thumbTipScreen.x + indexTipScreen.x) / 2, (thumbTipScreen.y + indexTipScreen.y) / 2);
                                     }
                                 } else {
                                     hand.isPinching = false;
+                                    _this1.confirmedPinchState[i] = false;
+                                    _this1.pinchStabilityFrames[i] = 0;
+                                    _this1.unpinchStabilityFrames[i] = 0;
                                 }
                                 // Fist detection logic (simple version based on finger curl)
                                 // This is a basic fist detection. More robust methods might involve checking distances
@@ -1194,7 +1231,7 @@ export var Game = /*#__PURE__*/ function() {
                                                 _this1.pickedUpModel = pickedModel;
                                                 _this1.handRotateLastX[i] = hand.pinchPointScreen.x;
                                                 _this1.rotateLastHandX = _this1.handRotateLastX[i];
-                                                console.log("Hand ".concat(i, " INITIATED ROTATION on model via pinch from anywhere."));
+                                                console.log("Hand ".concat(i, " INITIATED ROTATION on model via pinch."));
                                             }
                                         } else if (_this1.handGrabbedModels[i] && _this1.handRotateLastX[i] !== null) {
                                             var grabbedModel = _this1.handGrabbedModels[i];
@@ -1269,6 +1306,11 @@ export var Game = /*#__PURE__*/ function() {
                                 }
                                 _this1._updateHandLines(i, smoothedLandmarks, videoParams, canvasWidth, canvasHeight);
                             } else {
+                                // Reset pinch stability when hand disappears
+                                _this1.confirmedPinchState[i] = false;
+                                _this1.pinchStabilityFrames[i] = 0;
+                                _this1.unpinchStabilityFrames[i] = 0;
+                                
                                 if (_this1.handGrabbedModels[i] && (_this1.interactionMode === 'drag' || _this1.interactionMode === 'rotate')) {
                                     console.log("Hand ".concat(i, " (which was grabbing) disappeared. Releasing model."));
                                     _this1.handGrabbedModels[i] = null;
@@ -1382,8 +1424,15 @@ export var Game = /*#__PURE__*/ function() {
                     }
                     var bbox = this._getModelScreenBoundingBox(model);
                     if (!bbox) continue;
-                    var closestX = Math.max(bbox.minX, Math.min(pinchScreenX, bbox.maxX));
-                    var closestY = Math.max(bbox.minY, Math.min(pinchScreenY, bbox.maxY));
+                    // Apply padding to bounding box to make grabbing easier
+                    var paddedBbox = {
+                        minX: bbox.minX - this.boundingBoxPadding,
+                        maxX: bbox.maxX + this.boundingBoxPadding,
+                        minY: bbox.minY - this.boundingBoxPadding,
+                        maxY: bbox.maxY + this.boundingBoxPadding
+                    };
+                    var closestX = Math.max(paddedBbox.minX, Math.min(pinchScreenX, paddedBbox.maxX));
+                    var closestY = Math.max(paddedBbox.minY, Math.min(pinchScreenY, paddedBbox.maxY));
                     var distance = Math.sqrt(
                         Math.pow(pinchScreenX - closestX, 2) +
                         Math.pow(pinchScreenY - closestY, 2)
@@ -1428,7 +1477,12 @@ export var Game = /*#__PURE__*/ function() {
                 modelsWithDistances.sort(function(a, b) {
                     return a.adjustedDistance - b.adjustedDistance;
                 });
-                return modelsWithDistances[0].model;
+                // Check if the closest model is within acceptable range
+                var closestEntry = modelsWithDistances[0];
+                if (closestEntry.distance > this.maxPickDistance) {
+                    return null;
+                }
+                return closestEntry.model;
             }
         },
         {
@@ -1453,14 +1507,21 @@ export var Game = /*#__PURE__*/ function() {
                     var model = this.interactiveModels[i];
                     var bbox = this._getModelScreenBoundingBox(model);
                     if (!bbox) continue;
-                    var closestX0 = Math.max(bbox.minX, Math.min(pinch0X, bbox.maxX));
-                    var closestY0 = Math.max(bbox.minY, Math.min(pinch0Y, bbox.maxY));
+                    // Apply padding to bounding box to make grabbing easier
+                    var paddedBbox = {
+                        minX: bbox.minX - this.boundingBoxPadding,
+                        maxX: bbox.maxX + this.boundingBoxPadding,
+                        minY: bbox.minY - this.boundingBoxPadding,
+                        maxY: bbox.maxY + this.boundingBoxPadding
+                    };
+                    var closestX0 = Math.max(paddedBbox.minX, Math.min(pinch0X, paddedBbox.maxX));
+                    var closestY0 = Math.max(paddedBbox.minY, Math.min(pinch0Y, paddedBbox.maxY));
                     var distance0 = Math.sqrt(
                         Math.pow(pinch0X - closestX0, 2) +
                         Math.pow(pinch0Y - closestY0, 2)
                     );
-                    var closestX1 = Math.max(bbox.minX, Math.min(pinch1X, bbox.maxX));
-                    var closestY1 = Math.max(bbox.minY, Math.min(pinch1Y, bbox.maxY));
+                    var closestX1 = Math.max(paddedBbox.minX, Math.min(pinch1X, paddedBbox.maxX));
+                    var closestY1 = Math.max(paddedBbox.minY, Math.min(pinch1Y, paddedBbox.maxY));
                     var distance1 = Math.sqrt(
                         Math.pow(pinch1X - closestX1, 2) +
                         Math.pow(pinch1Y - closestY1, 2)
@@ -1471,7 +1532,10 @@ export var Game = /*#__PURE__*/ function() {
                         closestModel = model;
                     }
                 }
-                console.log('Scale mode - picked model with avg distance:', minAvgDistance);
+                // Check if the closest model is within acceptable range (more lenient for two-hand scaling)
+                if (minAvgDistance > this.maxPickDistance * 1.5) {
+                    return null;
+                }
                 return closestModel;
             }
         },
@@ -2993,7 +3057,7 @@ export var Game = /*#__PURE__*/ function() {
                     var size = box.getSize(new THREE.Vector3());
                     var center = box.getCenter(new THREE.Vector3());
                     var scale = 150 / Math.max(size.x, size.y, size.z);
-                    _this.tulioModel.scale.set(0.01, 0.01, 0.01);
+                    _this.tulioModel.scale.set(0.1, 0.1, 0.1);
                     _this.tulioModel.position.set(
                         -center.x * scale,
                         -center.y * scale,
@@ -3006,11 +3070,12 @@ export var Game = /*#__PURE__*/ function() {
                         var startTime = Date.now();
                         var duration = 1000;
                         var targetScale = scale;
+                        var initialScale = 0.1;
                         var animateTulioEntrance = function() {
                             var elapsed = Date.now() - startTime;
                             var progress = Math.min(elapsed / duration, 1);
                             var easeProgress = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-                            var currentScale = 0.01 + (targetScale - 0.01) * easeProgress;
+                            var currentScale = initialScale + (targetScale - initialScale) * easeProgress;
                             _this.tulioModel.scale.set(currentScale, currentScale, currentScale);
                             _this.tulioModel.rotation.y = easeProgress * Math.PI * 2;
                             if (progress < 1) {

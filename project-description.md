@@ -1,0 +1,3 @@
+Imagination Lab is a fun platform where kids can explore and learn by talking to friendly characters. You get to choose your own character and environment, like a desert, a snowy mountain, or even outer space. Then you can have real conversations with your character just by talking - they will listen to you and talk back, creating other characters you can think of, and creating scenes of your own.
+
+To move through and interact with the scene, you use your hands. The computer watches your hands through the camera and lets you drag, rotate, and resize things in the 3D world just by moving your hands in front of the screen.
